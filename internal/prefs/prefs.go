@@ -25,6 +25,7 @@ const (
 type Preferences struct {
 	NameStyle NameStyle `json:"nameStyle"`
     HexSep    HexSeparator `json:"hexSeparator"`
+    LastDir   string       `json:"lastDir"`
 }
 
 func Default() Preferences {

@@ -3,6 +3,9 @@ package main
 import (
     "crypto/sha1"
     "crypto/sha256"
+    "crypto/ecdsa"
+    "crypto/ed25519"
+    "crypto/rsa"
     "crypto/x509"
     "crypto/x509/pkix"
     "encoding/asn1"
@@ -15,6 +18,7 @@ import (
     "fyne.io/fyne/v2/app"
     "fyne.io/fyne/v2/container"
     "fyne.io/fyne/v2/dialog"
+    "fyne.io/fyne/v2/theme"
     "fyne.io/fyne/v2/storage"
     "fyne.io/fyne/v2/widget"
 
@@ -37,36 +41,22 @@ func main() {
     // Summary tab contents: tight two-column layout (name | value)
     summaryGrid := container.New(ui.NewTightTwoColLayout(),
         boldLabel("Open a certificate to view its summary."),
-        monoLabel(""),
+        copyRow(window, ""),
     )
 
-	// Details table model
-	detailRows := [][]string{}
-	detailsTable := widget.NewTable(
-		func() (int, int) { // rows, cols
-			return len(detailRows), 2
-		},
-		func() fyne.CanvasObject { // create
-			return widget.NewLabel("")
-		},
-		func(i widget.TableCellID, o fyne.CanvasObject) { // update
-			if i.Row < len(detailRows) && i.Col < 2 {
-				label := o.(*widget.Label)
-				label.SetText(detailRows[i.Row][i.Col])
-			}
-		},
-	)
-	detailsTable.SetColumnWidth(0, 240)
+    // Details view as tight two-column layout inside a scroll container
+    detailsContainer := container.New(ui.NewTightTwoColLayout())
+    detailsScroll := container.NewVScroll(detailsContainer)
 
 	// Tabs
     tabs := container.NewAppTabs(
         container.NewTabItem("Summary", container.NewVScroll(summaryGrid)),
-		container.NewTabItem("Details", container.NewMax(detailsTable)),
-	)
+        container.NewTabItem("Details", detailsScroll),
+    )
 
 	// Menu actions
-	openCert := func() {
-		fd := dialog.NewFileOpen(func(rc fyne.URIReadCloser, err error) {
+    openCert := func() {
+        fd := dialog.NewFileOpen(func(rc fyne.URIReadCloser, err error) {
 			if err != nil {
 				dialog.ShowError(err, window)
 				return
@@ -88,10 +78,25 @@ func main() {
 				return
 			}
 			currentCert = cert
-            refreshSummaryAndDetails(summaryGrid, detailsTable, &detailRows, currentCert, userPreferences)
-		}, window)
-		fd.SetFilter(storage.NewExtensionFileFilter([]string{".cer", ".crt", ".pem", ".der"}))
-		fd.Show()
+            // Save last directory from the opened file's URI
+            if rc.URI() != nil {
+                if parent, perr := storage.Parent(rc.URI()); perr == nil && parent != nil {
+                    userPreferences.LastDir = parent.String()
+                    _ = prefs.Save(userPreferences)
+                }
+            }
+            refreshSummaryAndDetails(window, summaryGrid, detailsContainer, currentCert, userPreferences)
+        }, window)
+        // Set initial location from preferences if present
+        if userPreferences.LastDir != "" {
+            if u, err := storage.ParseURI(userPreferences.LastDir); err == nil && u != nil {
+                if l, lerr := storage.ListerForURI(u); lerr == nil && l != nil {
+                    fd.SetLocation(l)
+                }
+            }
+        }
+        fd.SetFilter(storage.NewExtensionFileFilter([]string{".cer", ".crt", ".pem", ".der"}))
+        fd.Show()
 	}
 
     preferencesDialog := func() {
@@ -151,7 +156,7 @@ func main() {
             }
             _ = prefs.Save(userPreferences)
             if currentCert != nil {
-                refreshSummaryAndDetails(summaryGrid, detailsTable, &detailRows, currentCert, userPreferences)
+                refreshSummaryAndDetails(window, summaryGrid, detailsContainer, currentCert, userPreferences)
             }
         }, window)
         d.Resize(fyne.NewSize(420, 260))
@@ -173,7 +178,7 @@ func main() {
 	window.ShowAndRun()
 }
 
-func refreshSummaryAndDetails(summaryGrid *fyne.Container, details *widget.Table, rows *[][]string, cert *x509.Certificate, p prefs.Preferences) {
+func refreshSummaryAndDetails(win fyne.Window, summaryGrid *fyne.Container, details *fyne.Container, cert *x509.Certificate, p prefs.Preferences) {
     // Summary content: clear and add name/value rows
     summaryGrid.Objects = nil
     cn := cert.Subject.CommonName
@@ -182,7 +187,7 @@ func refreshSummaryAndDetails(summaryGrid *fyne.Container, details *widget.Table
     }
     addSummaryRow := func(name, value string) {
         summaryGrid.Add(boldLabel(name))
-        summaryGrid.Add(monoLabel(value))
+        summaryGrid.Add(copyRow(win, value))
     }
     addSummaryRow("Common Name", cn)
     addSummaryRow("Subject", cert.Subject.String())
@@ -204,17 +209,121 @@ func refreshSummaryAndDetails(summaryGrid *fyne.Container, details *widget.Table
     addSummaryRow("SHA-1 Fingerprint", formatHex(sha1Sum[:], p.HexSep))
     summaryGrid.Refresh()
 
-	// Details rows (Subject and Issuer attributes based on preference)
-	var newRows [][]string
-	newRows = append(newRows, []string{"Section", "Value"})
-    for _, pair := range extractNameAttributes(cert.Subject.Names, p.NameStyle, "Subject") {
-		newRows = append(newRows, pair)
-	}
-    for _, pair := range extractNameAttributes(cert.Issuer.Names, p.NameStyle, "Issuer") {
-		newRows = append(newRows, pair)
-	}
-	*rows = newRows
-	details.Refresh()
+    // Details rows expanded with group headers -> render into container
+    details.Objects = nil
+    addHeader := func(title string) {
+        details.Add(boldLabel(title))
+        details.Add(widget.NewLabel(""))
+    }
+    addPair := func(name, value string) {
+        details.Add(widget.NewLabel(name))
+        v := widget.NewRichTextWithText(value)
+        v.Wrapping = fyne.TextWrapWord
+        details.Add(v)
+    }
+
+    // General
+    addHeader("General")
+    addPair("Version", fmt.Sprintf("%d", cert.Version))
+    addPair("Serial Number", formatSerialWithSep(cert.SerialNumber, p.HexSep))
+    addPair("Signature Algorithm", cert.SignatureAlgorithm.String())
+    addPair("Issuer", cert.Issuer.String())
+    if p.NameStyle == prefs.Windows {
+        addPair("Valid From", cert.NotBefore.Format("2006-01-02 15:04:05 MST"))
+        addPair("Valid To", cert.NotAfter.Format("2006-01-02 15:04:05 MST"))
+    } else {
+        addPair("Not Before", cert.NotBefore.Format("2006-01-02 15:04:05 MST"))
+        addPair("Not After", cert.NotAfter.Format("2006-01-02 15:04:05 MST"))
+    }
+    addPair("Subject", cert.Subject.String())
+    // Subject and Issuer attribute breakdown
+    addHeader("Subject Attributes")
+    for _, pair := range extractNameAttributes(cert.Subject.Names, p.NameStyle, "") {
+        addPair(pair[0], pair[1])
+    }
+    addHeader("Issuer Attributes")
+    for _, pair := range extractNameAttributes(cert.Issuer.Names, p.NameStyle, "") {
+        addPair(pair[0], pair[1])
+    }
+
+    // Subject Public Key Info
+    addHeader("Subject Public Key Info")
+    addPair("Public Key Algorithm", cert.PublicKeyAlgorithm.String())
+    switch pk := cert.PublicKey.(type) {
+    case *rsa.PublicKey:
+        addPair("Public-Key", fmt.Sprintf("(%d bit)", pk.N.BitLen()))
+        addPair("RSA Exponent", fmt.Sprintf("%d", pk.E))
+    case *ecdsa.PublicKey:
+        bits := pk.Params().BitSize
+        addPair("Public-Key", fmt.Sprintf("(%d bit)", bits))
+        if pk.Curve != nil && pk.Curve.Params() != nil {
+            addPair("ASN1 OID", pk.Curve.Params().Name)
+            addPair("NIST CURVE", nistCurveName(pk.Curve.Params().Name))
+        }
+        // Uncompressed point 0x04 || X || Y
+        xBytes := pk.X.Bytes()
+        yBytes := pk.Y.Bytes()
+        // Pad to curve size
+        byteLen := (bits + 7) / 8
+        if len(xBytes) < byteLen { xBytes = append(make([]byte, byteLen-len(xBytes)), xBytes...) }
+        if len(yBytes) < byteLen { yBytes = append(make([]byte, byteLen-len(yBytes)), yBytes...) }
+        pub := make([]byte, 1+len(xBytes)+len(yBytes))
+        pub[0] = 0x04
+        copy(pub[1:1+len(xBytes)], xBytes)
+        copy(pub[1+len(xBytes):], yBytes)
+        addPair("pub", formatHex(pub, p.HexSep))
+    case ed25519.PublicKey:
+        addPair("Public-Key", "(256 bit)")
+        addPair("Ed25519", formatHex([]byte(pk), p.HexSep))
+    default:
+        addPair("Public-Key", "(unknown)")
+    }
+
+    // X509v3 extensions
+    addHeader("X509v3 extensions")
+    if ku := keyUsageNames(cert.KeyUsage); ku != "" { addPair("X509v3 Key Usage", ku) }
+    if eku := extKeyUsageNames(cert.ExtKeyUsage); eku != "" { addPair("X509v3 Extended Key Usage", eku) }
+    if cert.BasicConstraintsValid {
+        bc := "CA:FALSE"
+        if cert.IsCA { bc = "CA:TRUE" }
+        if cert.MaxPathLen >= 0 { bc = fmt.Sprintf("%s, pathlen:%d", bc, cert.MaxPathLen) }
+        addPair("X509v3 Basic Constraints", bc)
+    }
+    if len(cert.SubjectKeyId) > 0 { addPair("X509v3 Subject Key Identifier", formatHex(cert.SubjectKeyId, p.HexSep)) }
+    if len(cert.AuthorityKeyId) > 0 { addPair("X509v3 Authority Key Identifier", formatHex(cert.AuthorityKeyId, p.HexSep)) }
+    // AIA
+    if len(cert.OCSPServer) > 0 { addPair("OCSP", strings.Join(cert.OCSPServer, ", ")) }
+    if len(cert.IssuingCertificateURL) > 0 { addPair("CA Issuers", strings.Join(cert.IssuingCertificateURL, ", ")) }
+    // SANs
+    if len(cert.DNSNames) > 0 { addPair("DNS", strings.Join(cert.DNSNames, ", ")) }
+    if len(cert.EmailAddresses) > 0 { addPair("Email", strings.Join(cert.EmailAddresses, ", ")) }
+    if len(cert.IPAddresses) > 0 {
+        ips := make([]string, len(cert.IPAddresses))
+        for i, ip := range cert.IPAddresses { ips[i] = ip.String() }
+        addPair("IP", strings.Join(ips, ", "))
+    }
+    if len(cert.URIs) > 0 {
+        uris := make([]string, len(cert.URIs))
+        for i, u := range cert.URIs { uris[i] = u.String() }
+        addPair("URI", strings.Join(uris, ", "))
+    }
+    // Policies
+    if len(cert.PolicyIdentifiers) > 0 {
+        oids := make([]string, len(cert.PolicyIdentifiers))
+        for i, oid := range cert.PolicyIdentifiers { oids[i] = oidToString(oid) }
+        addPair("Certificate Policies", strings.Join(oids, ", "))
+    }
+    // CRL Distribution Points
+    if len(cert.CRLDistributionPoints) > 0 { addPair("CRL Distribution Points", strings.Join(cert.CRLDistributionPoints, ", ")) }
+    // CT SCTs
+    // Note: crypto/x509 does not expose parsed SCTs; skip detailed listing.
+
+    // Signature
+    addHeader("Signature")
+    addPair("Signature Algorithm", cert.SignatureAlgorithm.String())
+    if len(cert.Signature) > 0 { addPair("Signature Value", formatHex(cert.Signature, p.HexSep)) }
+
+    details.Refresh()
 }
 
 func extractNameAttributes(attrs []pkix.AttributeTypeAndValue, style prefs.NameStyle, prefix string) [][]string {
@@ -222,7 +331,11 @@ func extractNameAttributes(attrs []pkix.AttributeTypeAndValue, style prefs.NameS
 	for _, atv := range attrs {
         name := mapOIDToName(atv.Type, style)
 		value := fmt.Sprintf("%v", atv.Value)
-		pairs = append(pairs, []string{fmt.Sprintf("%s %s", prefix, name), value})
+        label := name
+        if prefix != "" {
+            label = fmt.Sprintf("%s %s", prefix, name)
+        }
+        pairs = append(pairs, []string{label, value})
 	}
 	return pairs
 }
@@ -276,6 +389,61 @@ func oidToString(oid asn1.ObjectIdentifier) string {
 	return strings.Join(parts, ".")
 }
 
+func keyUsageNames(ku x509.KeyUsage) string {
+    names := []string{}
+    if ku&x509.KeyUsageDigitalSignature != 0 { names = append(names, "Digital Signature") }
+    if ku&x509.KeyUsageContentCommitment != 0 { names = append(names, "Non Repudiation") }
+    if ku&x509.KeyUsageKeyEncipherment != 0 { names = append(names, "Key Encipherment") }
+    if ku&x509.KeyUsageDataEncipherment != 0 { names = append(names, "Data Encipherment") }
+    if ku&x509.KeyUsageKeyAgreement != 0 { names = append(names, "Key Agreement") }
+    if ku&x509.KeyUsageCertSign != 0 { names = append(names, "Certificate Sign") }
+    if ku&x509.KeyUsageCRLSign != 0 { names = append(names, "CRL Sign") }
+    if ku&x509.KeyUsageEncipherOnly != 0 { names = append(names, "Encipher Only") }
+    if ku&x509.KeyUsageDecipherOnly != 0 { names = append(names, "Decipher Only") }
+    return strings.Join(names, ", ")
+}
+
+func extKeyUsageNames(usages []x509.ExtKeyUsage) string {
+    if len(usages) == 0 { return "" }
+    names := make([]string, 0, len(usages))
+    for _, u := range usages {
+        switch u {
+        case x509.ExtKeyUsageAny: names = append(names, "Any")
+        case x509.ExtKeyUsageServerAuth: names = append(names, "TLS Web Server Authentication")
+        case x509.ExtKeyUsageClientAuth: names = append(names, "TLS Web Client Authentication")
+        case x509.ExtKeyUsageCodeSigning: names = append(names, "Code Signing")
+        case x509.ExtKeyUsageEmailProtection: names = append(names, "E-mail Protection")
+        case x509.ExtKeyUsageIPSECEndSystem: names = append(names, "IPSec End System")
+        case x509.ExtKeyUsageIPSECTunnel: names = append(names, "IPSec Tunnel")
+        case x509.ExtKeyUsageIPSECUser: names = append(names, "IPSec User")
+        case x509.ExtKeyUsageTimeStamping: names = append(names, "Time Stamping")
+        case x509.ExtKeyUsageOCSPSigning: names = append(names, "OCSP Signing")
+        case x509.ExtKeyUsageMicrosoftServerGatedCrypto: names = append(names, "Microsoft Server Gated Crypto")
+        case x509.ExtKeyUsageNetscapeServerGatedCrypto: names = append(names, "Netscape Server Gated Crypto")
+        case x509.ExtKeyUsageMicrosoftCommercialCodeSigning: names = append(names, "Microsoft Commercial Code Signing")
+        case x509.ExtKeyUsageMicrosoftKernelCodeSigning: names = append(names, "Microsoft Kernel Code Signing")
+        default:
+            names = append(names, fmt.Sprintf("Unknown (%d)", u))
+        }
+    }
+    return strings.Join(names, ", ")
+}
+
+func nistCurveName(oidOrName string) string {
+    // The Go stdlib exposes curve param Name already as a friendly string (e.g., P-256)
+    // For completeness we pass-through here.
+    switch oidOrName {
+    case "P-256", "prime256v1":
+        return "P-256"
+    case "P-384", "secp384r1":
+        return "P-384"
+    case "P-521", "secp521r1":
+        return "P-521"
+    default:
+        return oidOrName
+    }
+}
+
 // boldLabel returns a name label with bold style.
 func boldLabel(text string) *widget.Label {
     lbl := widget.NewLabel(text)
@@ -283,15 +451,21 @@ func boldLabel(text string) *widget.Label {
     return lbl
 }
 
-// monoLabel returns a value text with monospace font. RichText supports selection/copy.
-func monoLabel(text string) *widget.RichText {
-    rt := widget.NewRichText()
-    rt.Wrapping = fyne.TextWrapWord
-    rt.Segments = []widget.RichTextSegment{
+// copyRow builds a value widget with monospace text and a copy button.
+func copyRow(win fyne.Window, text string) fyne.CanvasObject {
+    value := widget.NewRichTextWithText(text)
+    value.Wrapping = fyne.TextWrapWord
+    // Apply monospace style
+    value.Segments = []widget.RichTextSegment{
         &widget.TextSegment{Text: text, Style: widget.RichTextStyle{TextStyle: fyne.TextStyle{Monospace: true}}},
     }
-    rt.Refresh()
-    return rt
+    copyBtn := widget.NewButtonWithIcon("", theme.ContentCopyIcon(), func() {
+        win.Clipboard().SetContent(text)
+    })
+    copyBtn.Importance = widget.LowImportance
+    // Keep button narrow; arrange inline with value using a grid of 2 columns
+    row := container.NewBorder(nil, nil, nil, copyBtn, value)
+    return row
 }
 
 func formatHex(sum []byte, sep prefs.HexSeparator) string {

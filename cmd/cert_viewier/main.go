@@ -25,14 +25,14 @@ import (
     "fyne.io/fyne/v2/storage"
     "fyne.io/fyne/v2/widget"
 
-    "cert_viewier/internal/certs"
-    "cert_viewier/internal/prefs"
-    "cert_viewier/internal/ui"
-    "cert_viewier/internal/resources"
+    "cert_viewer/internal/certs"
+    "cert_viewer/internal/prefs"
+    "cert_viewer/internal/ui"
+    "cert_viewer/internal/resources"
 )
 
 func main() {
-    application := app.NewWithID("io.github.crowderb.cert_viewier")
+    application := app.NewWithID("io.github.crowderb.cert_viewer")
 	window := application.NewWindow("Certificate Viewer")
 	window.Resize(fyne.NewSize(800, 600))
 

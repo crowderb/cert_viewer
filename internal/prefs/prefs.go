@@ -115,7 +115,7 @@ func CacheDir() (string, error) {
     if err != nil {
         return "", err
     }
-    dir := filepath.Join(base, "cert_viewier")
+    dir := filepath.Join(base, "cert_viewer")
     if err := os.MkdirAll(dir, 0o755); err != nil {
         return "", err
     }
@@ -127,7 +127,7 @@ func configPath() (configDir string, fileName string, fullPath string, err error
     if err != nil {
         return "", "", "", err
     }
-    dir := filepath.Join(base, "cert_viewier")
+    dir := filepath.Join(base, "cert_viewer")
     name := "preferences.json"
     return dir, name, filepath.Join(dir, name), nil
 }

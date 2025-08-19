@@ -1,4 +1,4 @@
-# cert_viewier
+# cert_viewer
 
 A cross-platform GUI application written in Go using Fyne to inspect X.509 certificates.
 
@@ -24,8 +24,8 @@ A cross-platform GUI application written in Go using Fyne to inspect X.509 certi
   - Resources > CCADB CSV dialog shows file path and timestamp, with a "Fetch Now" button
 
 ## Paths
-- Config: `~/.config/cert_viewier/preferences.json`
-- Cache: `~/.cache/cert_viewier/ccadb_all_certificate_records_v2.csv`
+- Config: `~/.config/cert_viewer/preferences.json`
+- Cache: `~/.cache/cert_viewer/ccadb_all_certificate_records_v2.csv`
 
 ## Build
 ```bash
@@ -33,10 +33,10 @@ A cross-platform GUI application written in Go using Fyne to inspect X.509 certi
 go mod tidy
 
 # run
-go run ./cmd/cert_viewier
+go run ./cmd/cert_viewer
 
 # build
-go build -o bin/cert_viewier ./cmd/cert_viewier
+go build -o bin/cert_viewer ./cmd/cert_viewer
 ```
 
 ## Platform notes

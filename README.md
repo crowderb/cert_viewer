@@ -14,7 +14,9 @@ A cross-platform GUI application written in Go using Fyne to inspect X.509 certi
 - Chain tab
   - Builds a chain up to 5 levels using AIA (CA Issuers) links
   - Detects self-signed certs (AKI == SKI)
-  - Checks CCADB CSV for Subject Key Identifier to identify a trusted root
+  - Resolves a trusted root by checking Subject Key Identifier against:
+    1) Local system trust store summary (preferred)
+    2) CCADB CSV cache
   - Each chain element shows the same summary info plus SKI/AKI
 - Preferences (JSON) under OS config dir
   - UI Settings: attribute name style (OpenSSL vs Windows), hex separator, last opened directory
@@ -22,10 +24,14 @@ A cross-platform GUI application written in Go using Fyne to inspect X.509 certi
 - CCADB CSV integration
   - Background refresh on startup to cache `AllCertificateRecordsCSVFormatv2` to the OS cache dir
   - Resources > CCADB CSV dialog shows file path and timestamp, with a "Fetch Now" button
+ - Local roots (Linux)
+   - On startup, parses `/etc/ssl/certs/ca-certificates.crt` and creates a local summary JSON (if missing)
+   - Local summary includes: Subject, SKI, Not Before, Not After, SHA-256
 
 ## Paths
 - Config: `~/.config/cert_viewer/preferences.json`
 - Cache: `~/.cache/cert_viewer/ccadb_all_certificate_records_v2.csv`
+ - Local roots summary (generated): `~/.cache/cert_viewer/local_roots.json`
 
 ## Build
 ```bash

@@ -190,6 +190,8 @@ func main() {
     ctx, cancel := context.WithCancel(context.Background())
     defer cancel()
     _ = resources.EnsureCCADBCSV(ctx, userPreferences)
+    // Ensure local roots JSON exists (Linux bundle)
+    _ = resources.EnsureLocalRootsJSON(ctx)
 
     // Enable drag-and-drop to open certificate files
     window.SetOnDropped(func(pos fyne.Position, uris []fyne.URI) {
@@ -400,8 +402,9 @@ func buildAndRenderChain(win fyne.Window, chainTabs *container.AppTabs, leaf *x5
     }
     addCertTab("Leaf", leaf)
 
-    // Load CCADB SKI set if available
-    skiSet, _ := resources.LoadCCADBSKISet()
+    // Load local roots and CCADB SKI sets if available
+    localSet, _ := resources.LoadLocalRootsSKISet()
+    ccadbSet, _ := resources.LoadCCADBSKISet()
     current := leaf
     for depth := 1; depth <= 5; depth++ {
         // Self-signed if AKI equals SKI
@@ -430,10 +433,15 @@ func buildAndRenderChain(win fyne.Window, chainTabs *container.AppTabs, leaf *x5
         c := issuerCert
         addCertTab(title, c)
         chainTabs.Refresh()
-        // Check CCADB SKI
+        // Check local roots first, then CCADB
         if len(c.SubjectKeyId) > 0 {
             key := normalizeHex(c.SubjectKeyId)
-            if _, ok := skiSet[key]; ok {
+            if _, ok := localSet[key]; ok {
+                chainTabs.Append(container.NewTabItem("Root (from Local Store)", widget.NewLabel("Found Subject Key Identifier in local system trust bundle")))
+                chainTabs.Refresh()
+                return
+            }
+            if _, ok := ccadbSet[key]; ok {
                 chainTabs.Append(container.NewTabItem("Root (from CCADB)", widget.NewLabel("Found Subject Key Identifier in CCADB CSV")))
                 chainTabs.Refresh()
                 return

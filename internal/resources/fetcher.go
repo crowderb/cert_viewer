@@ -12,7 +12,7 @@ import (
 	"time"
     "strings"
 
-	"cert_viewer/internal/prefs"
+    "cert_viewer/internal/prefs"
 )
 
 const ccadbCachedName = "ccadb_all_certificate_records_v2.csv"

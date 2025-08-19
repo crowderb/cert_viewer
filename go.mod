@@ -1,4 +1,4 @@
-module cert_viewier
+module cert_viewer
 
 go 1.21
 

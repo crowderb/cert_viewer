@@ -26,6 +26,7 @@ type UISettings struct {
     NameStyle NameStyle   `json:"nameStyle"`
     HexSep    HexSeparator `json:"hexSeparator"`
     LastDir   string       `json:"lastDir"`
+    ShowCCADBOnlyCerts bool `json:"showCCADBOnlyCerts"`
 }
 
 type Resources struct {
@@ -44,6 +45,7 @@ func Default() Preferences {
             NameStyle: OpenSSL,
             HexSep:    HexColon,
             LastDir:   "",
+            ShowCCADBOnlyCerts: false,
         },
         Resources: Resources{
             CCADBURL:    "https://ccadb.my.salesforce-sites.com/ccadb/AllCertificateRecordsCSVFormatv2",
@@ -79,6 +81,7 @@ func Load() (Preferences, error) {
     default:
         p.UI.HexSep = HexColon
     }
+    // ShowCCADBOnlyCerts defaults to false when missing; no further validation
     if p.Resources.RefreshDays <= 0 {
         p.Resources.RefreshDays = 30
     }

@@ -18,6 +18,14 @@ A cross-platform GUI application written in Go using Fyne to inspect X.509 certi
     1) Local system trust store summary (preferred)
     2) CCADB CSV cache
   - Each chain element shows the same summary info plus SKI/AKI
+- Advanced comparison
+  - Compares the local system store against CCADB
+  - Sections:
+    - Certificates in Local Store Only (local roots present but not in CCADB)
+    - Certificates in CCADB Only (optional; disabled by default)
+    - Certificates in Both
+  - CCADB items are filtered to exclude “Not Trusted” (Apple/Chrome/Microsoft/Mozilla) and expired entries
+  - Preference `UI Settings.showCCADBOnlyCerts` toggles visibility of the CCADB-only section
 - Preferences (JSON) under OS config dir
   - UI Settings: attribute name style (OpenSSL vs Windows), hex separator, last opened directory
   - Resources: CCADB CSV URL and refresh interval (days)
@@ -27,6 +35,9 @@ A cross-platform GUI application written in Go using Fyne to inspect X.509 certi
  - Local roots (Linux)
    - On startup, parses `/etc/ssl/certs/ca-certificates.crt` and creates a local summary JSON (if missing)
    - Local summary includes: Subject, SKI, Not Before, Not After, SHA-256
+
+## Interpreting Results
+- Certificates in Local Store Only: This can indicate a deliberate or managed trust intervention on the host (e.g., enterprise/mobile device management adding custom roots). Investigate according to your environment’s policies.
 
 ## Paths
 - Config: `~/.config/cert_viewer/preferences.json`

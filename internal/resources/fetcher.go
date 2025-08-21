@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"encoding/csv"
+	"encoding/base64"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -139,7 +140,7 @@ func LoadCCADBSKISet() (map[string]struct{}, error) {
             return set, err
         }
         if skiIdx < len(rec) {
-            norm := normalizeHex(rec[skiIdx])
+            norm := parseSKIToUpperHex(rec[skiIdx])
             if norm != "" {
                 set[norm] = struct{}{}
             }
@@ -148,24 +149,137 @@ func LoadCCADBSKISet() (map[string]struct{}, error) {
     return set, nil
 }
 
+// LoadCCADBSummary loads CCADB rows and returns a map SKI(hex upper) -> {subject, notAfter}
+// If the CSV is missing columns, best-effort data is returned.
+func LoadCCADBSummary() (map[string]struct{ Subject string; NotAfter time.Time }, error) {
+    path, err := CachePath()
+    if err != nil { return nil, err }
+    f, err := os.Open(path)
+    if err != nil {
+        if errors.Is(err, os.ErrNotExist) { return map[string]struct{ Subject string; NotAfter time.Time }{}, nil }
+        return nil, err
+    }
+    defer f.Close()
+    r := csv.NewReader(f)
+    header, err := r.Read()
+    if err != nil { return nil, err }
+    skiIdx, subjectIdx, notAfterIdx := -1, -1, -1
+    appleIdx, chromeIdx, msIdx, mozIdx := -1, -1, -1, -1
+    for i, h := range header {
+        switch {
+        case equalFoldTrim(h, "Subject Key Identifier"):
+            skiIdx = i
+        case equalFoldTrim(h, "Certificate Name"):
+            subjectIdx = i
+        case equalFoldTrim(h, "Valid To (GMT)"):
+            notAfterIdx = i
+        case equalFoldTrim(h, "Apple Status"):
+            appleIdx = i
+        case equalFoldTrim(h, "Chrome Status"):
+            chromeIdx = i
+        case equalFoldTrim(h, "Microsoft Status"):
+            msIdx = i
+        case equalFoldTrim(h, "Mozilla Status"):
+            mozIdx = i
+        }
+    }
+    out := make(map[string]struct{ Subject string; NotAfter time.Time })
+    for {
+        rec, err := r.Read()
+        if err != nil {
+            if errors.Is(err, io.EOF) { break }
+            return out, err
+        }
+        if skiIdx < 0 || skiIdx >= len(rec) { continue }
+        // Exclude any row marked Not Trusted by major vendors
+        if isNotTrusted(rec, appleIdx) || isNotTrusted(rec, chromeIdx) || isNotTrusted(rec, msIdx) || isNotTrusted(rec, mozIdx) {
+            continue
+        }
+        ski := parseSKIToUpperHex(rec[skiIdx])
+        if ski == "" { continue }
+        subject := ""
+        if subjectIdx >= 0 && subjectIdx < len(rec) { subject = strings.TrimSpace(rec[subjectIdx]) }
+        var notAfter time.Time
+        if notAfterIdx >= 0 && notAfterIdx < len(rec) {
+            notAfter = parseCCADBDate(rec[notAfterIdx])
+        }
+        out[ski] = struct{ Subject string; NotAfter time.Time }{Subject: subject, NotAfter: notAfter}
+    }
+    return out, nil
+}
+
+func isNotTrusted(rec []string, idx int) bool {
+    if idx < 0 || idx >= len(rec) { return false }
+    v := strings.TrimSpace(rec[idx])
+    return strings.EqualFold(v, "Not Trusted")
+}
+
+func parseCCADBDate(s string) time.Time {
+    t := strings.TrimSpace(s)
+    if t == "" { return time.Time{} }
+    // CCADB uses formats like: Jan 02 15:04:05 2006 GMT
+    // Try a couple of common layouts
+    layouts := []string{
+        "Jan 2 15:04:05 2006 MST",
+        "Jan 02 15:04:05 2006 MST",
+        time.RFC3339,
+    }
+    for _, layout := range layouts {
+        if tt, err := time.Parse(layout, t); err == nil { return tt }
+    }
+    return time.Time{}
+}
+
 func equalFoldTrim(a, b string) bool {
     return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
-func normalizeHex(s string) string {
-    // Keep hex chars only and uppercase
-    out := make([]rune, 0, len(s))
-    for _, r := range s {
-        switch {
-        case r >= '0' && r <= '9':
-            out = append(out, r)
-        case r >= 'a' && r <= 'f':
-            out = append(out, r-('a'-'A'))
-        case r >= 'A' && r <= 'F':
-            out = append(out, r)
+func parseSKIToUpperHex(s string) string {
+    t := strings.TrimSpace(s)
+    if t == "" {
+        return ""
+    }
+    // First try hex with common separators removed
+    cleaned := make([]byte, 0, len(t))
+    hexCandidate := true
+    for i := 0; i < len(t); i++ {
+        c := t[i]
+        switch c {
+        case ':', ' ', '\t', '\n', '\r':
+            continue
         default:
-            // skip
+            // check hex
+            if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F')) {
+                hexCandidate = false
+            }
+            cleaned = append(cleaned, c)
         }
     }
-    return string(out)
+    if hexCandidate && len(cleaned)%2 == 0 && len(cleaned) > 0 {
+        // Uppercase and return
+        for i := 0; i < len(cleaned); i++ {
+            if cleaned[i] >= 'a' && cleaned[i] <= 'f' {
+                cleaned[i] = cleaned[i] - ('a' - 'A')
+            }
+        }
+        return string(cleaned)
+    }
+    // Fallback: base64 decode
+    if b, err := base64.StdEncoding.DecodeString(t); err == nil {
+        return bytesToUpperHex(b)
+    }
+    if b, err := base64.RawStdEncoding.DecodeString(t); err == nil {
+        return bytesToUpperHex(b)
+    }
+    return ""
+}
+
+func bytesToUpperHex(b []byte) string {
+    if len(b) == 0 { return "" }
+    var sb strings.Builder
+    sb.Grow(len(b) * 2)
+    for _, by := range b {
+        sb.WriteString(fmt.Sprintf("%02X", by))
+    }
+    return sb.String()
 }

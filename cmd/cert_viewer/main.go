@@ -7,8 +7,6 @@ import (
     "crypto/ed25519"
     "crypto/rsa"
     "crypto/x509"
-    "crypto/x509/pkix"
-    "encoding/asn1"
     "fmt"
     "io"
     "strings"
@@ -16,6 +14,8 @@ import (
     "context"
     "net/http"
     "os"
+    "image/color"
+    "time"
 
     "fyne.io/fyne/v2"
     "fyne.io/fyne/v2/app"
@@ -24,6 +24,7 @@ import (
     "fyne.io/fyne/v2/theme"
     "fyne.io/fyne/v2/storage"
     "fyne.io/fyne/v2/widget"
+    "fyne.io/fyne/v2/canvas"
 
     "cert_viewer/internal/certs"
     "cert_viewer/internal/prefs"
@@ -52,12 +53,15 @@ func main() {
     detailsContainer := container.New(ui.NewTightTwoColLayout())
     detailsScroll := container.NewVScroll(detailsContainer)
     chainTabs := container.NewAppTabs()
+    // Advanced tab content placeholder
+    advancedContent := container.NewVBox()
 
 	// Tabs
     tabs := container.NewAppTabs(
         container.NewTabItem("Summary", container.NewVScroll(summaryGrid)),
         container.NewTabItem("Details", detailsScroll),
         container.NewTabItem("Chain", chainTabs),
+        container.NewTabItem("Advanced", container.NewVScroll(advancedContent)),
     )
 
 	// Menu actions
@@ -182,16 +186,25 @@ func main() {
 	)
     resourcesMenu := fyne.NewMenu("Resources",
         fyne.NewMenuItem("CCADB CSV", func() { showCCADBDialog(window, userPreferences) }),
+        fyne.NewMenuItemSeparator(),
+        fyne.NewMenuItem("Compare Local vs CCADB", func() {
+            // Show placeholder and build in background to keep UI responsive
+            advancedContent.Objects = []fyne.CanvasObject{widget.NewLabel("Building comparison...")}
+            advancedContent.Refresh()
+            go func() {
+                _ = resources.EnsureLocalRootsJSON(context.Background())
+                buildAdvancedComparison(advancedContent, userPreferences)
+            }()
+            tabs.SelectIndex(3) // Advanced tab
+        }),
     )
     mainMenu := fyne.NewMainMenu(fileMenu, editMenu, resourcesMenu)
 	window.SetMainMenu(mainMenu)
 
-    // Kick off background refresh of CCADB CSV
+    // Prepare background context
     ctx, cancel := context.WithCancel(context.Background())
     defer cancel()
-    _ = resources.EnsureCCADBCSV(ctx, userPreferences)
-    // Ensure local roots JSON exists (Linux bundle)
-    _ = resources.EnsureLocalRootsJSON(ctx)
+    // Defer local roots generation until requested to avoid blocking startup
 
     // Enable drag-and-drop to open certificate files
     window.SetOnDropped(func(pos fyne.Position, uris []fyne.URI) {
@@ -228,6 +241,10 @@ func main() {
         })
 
     window.SetContent(tabs)
+
+    // Start CCADB refresh in background (no auto-rebuild)
+    go func() { <-resources.EnsureCCADBCSV(ctx, userPreferences) }()
+
     window.ShowAndRun()
 }
 
@@ -258,8 +275,8 @@ func refreshSummaryAndDetails(win fyne.Window, summaryGrid *fyne.Container, deta
 
     sha256Sum := sha256.Sum256(cert.Raw)
     sha1Sum := sha1.Sum(cert.Raw)
-    addSummaryRow("SHA-256 Fingerprint", formatHex(sha256Sum[:], p.UI.HexSep))
-    addSummaryRow("SHA-1 Fingerprint", formatHex(sha1Sum[:], p.UI.HexSep))
+    addSummaryRow("SHA-256 Fingerprint", certs.FormatHex(sha256Sum[:], string(p.UI.HexSep)))
+    addSummaryRow("SHA-1 Fingerprint", certs.FormatHex(sha1Sum[:], string(p.UI.HexSep)))
     summaryGrid.Refresh()
 
     // Details rows expanded with group headers -> render into container
@@ -278,7 +295,7 @@ func refreshSummaryAndDetails(win fyne.Window, summaryGrid *fyne.Container, deta
     // General
     addHeader("General")
     addPair("Version", fmt.Sprintf("%d", cert.Version))
-    addPair("Serial Number", formatSerialWithSep(cert.SerialNumber, p.UI.HexSep))
+    addPair("Serial Number", certs.FormatSerialWithSep(cert.SerialNumber, string(p.UI.HexSep)))
     addPair("Signature Algorithm", cert.SignatureAlgorithm.String())
     addPair("Issuer", cert.Issuer.String())
     if p.UI.NameStyle == prefs.Windows {
@@ -291,11 +308,11 @@ func refreshSummaryAndDetails(win fyne.Window, summaryGrid *fyne.Container, deta
     addPair("Subject", cert.Subject.String())
     // Subject and Issuer attribute breakdown
     addHeader("Subject Attributes")
-    for _, pair := range extractNameAttributes(cert.Subject.Names, p.UI.NameStyle, "") {
+    for _, pair := range certs.ExtractNameAttributes(cert.Subject.Names, p.UI.NameStyle == prefs.Windows, "") {
         addPair(pair[0], pair[1])
     }
     addHeader("Issuer Attributes")
-    for _, pair := range extractNameAttributes(cert.Issuer.Names, p.UI.NameStyle, "") {
+    for _, pair := range certs.ExtractNameAttributes(cert.Issuer.Names, p.UI.NameStyle == prefs.Windows, "") {
         addPair(pair[0], pair[1])
     }
 
@@ -311,7 +328,7 @@ func refreshSummaryAndDetails(win fyne.Window, summaryGrid *fyne.Container, deta
         addPair("Public-Key", fmt.Sprintf("(%d bit)", bits))
         if pk.Curve != nil && pk.Curve.Params() != nil {
             addPair("ASN1 OID", pk.Curve.Params().Name)
-            addPair("NIST CURVE", nistCurveName(pk.Curve.Params().Name))
+            addPair("NIST CURVE", certs.NISTCurveName(pk.Curve.Params().Name))
         }
         // Uncompressed point 0x04 || X || Y
         xBytes := pk.X.Bytes()
@@ -324,26 +341,26 @@ func refreshSummaryAndDetails(win fyne.Window, summaryGrid *fyne.Container, deta
         pub[0] = 0x04
         copy(pub[1:1+len(xBytes)], xBytes)
         copy(pub[1+len(xBytes):], yBytes)
-        addPair("pub", formatHex(pub, p.UI.HexSep))
+        addPair("pub", certs.FormatHex(pub, string(p.UI.HexSep)))
     case ed25519.PublicKey:
         addPair("Public-Key", "(256 bit)")
-        addPair("Ed25519", formatHex([]byte(pk), p.UI.HexSep))
+        addPair("Ed25519", certs.FormatHex([]byte(pk), string(p.UI.HexSep)))
     default:
         addPair("Public-Key", "(unknown)")
     }
 
     // X509v3 extensions
     addHeader("X509v3 extensions")
-    if ku := keyUsageNames(cert.KeyUsage); ku != "" { addPair("X509v3 Key Usage", ku) }
-    if eku := extKeyUsageNames(cert.ExtKeyUsage); eku != "" { addPair("X509v3 Extended Key Usage", eku) }
+    if ku := certs.KeyUsageNames(cert.KeyUsage); ku != "" { addPair("X509v3 Key Usage", ku) }
+    if eku := certs.ExtKeyUsageNames(cert.ExtKeyUsage); eku != "" { addPair("X509v3 Extended Key Usage", eku) }
     if cert.BasicConstraintsValid {
         bc := "CA:FALSE"
         if cert.IsCA { bc = "CA:TRUE" }
         if cert.MaxPathLen >= 0 { bc = fmt.Sprintf("%s, pathlen:%d", bc, cert.MaxPathLen) }
         addPair("X509v3 Basic Constraints", bc)
     }
-    if len(cert.SubjectKeyId) > 0 { addPair("X509v3 Subject Key Identifier", formatHex(cert.SubjectKeyId, p.UI.HexSep)) }
-    if len(cert.AuthorityKeyId) > 0 { addPair("X509v3 Authority Key Identifier", formatHex(cert.AuthorityKeyId, p.UI.HexSep)) }
+    if len(cert.SubjectKeyId) > 0 { addPair("X509v3 Subject Key Identifier", certs.FormatHex(cert.SubjectKeyId, string(p.UI.HexSep))) }
+    if len(cert.AuthorityKeyId) > 0 { addPair("X509v3 Authority Key Identifier", certs.FormatHex(cert.AuthorityKeyId, string(p.UI.HexSep))) }
     // AIA
     if len(cert.OCSPServer) > 0 { addPair("OCSP", strings.Join(cert.OCSPServer, ", ")) }
     if len(cert.IssuingCertificateURL) > 0 { addPair("CA Issuers", strings.Join(cert.IssuingCertificateURL, ", ")) }
@@ -363,7 +380,7 @@ func refreshSummaryAndDetails(win fyne.Window, summaryGrid *fyne.Container, deta
     // Policies
     if len(cert.PolicyIdentifiers) > 0 {
         oids := make([]string, len(cert.PolicyIdentifiers))
-        for i, oid := range cert.PolicyIdentifiers { oids[i] = oidToString(oid) }
+        for i, oid := range cert.PolicyIdentifiers { oids[i] = certs.OIDToString(oid) }
         addPair("Certificate Policies", strings.Join(oids, ", "))
     }
     // CRL Distribution Points
@@ -374,7 +391,7 @@ func refreshSummaryAndDetails(win fyne.Window, summaryGrid *fyne.Container, deta
     // Signature
     addHeader("Signature")
     addPair("Signature Algorithm", cert.SignatureAlgorithm.String())
-    if len(cert.Signature) > 0 { addPair("Signature Value", formatHex(cert.Signature, p.UI.HexSep)) }
+    if len(cert.Signature) > 0 { addPair("Signature Value", certs.FormatHex(cert.Signature, string(p.UI.HexSep))) }
 
     details.Refresh()
 }
@@ -392,11 +409,11 @@ func buildAndRenderChain(win fyne.Window, chainTabs *container.AppTabs, leaf *x5
         // Add SKI / AKI rows for chain visibility
         if len(cert.SubjectKeyId) > 0 {
             grid.Add(boldLabel("Subject Key Identifier"))
-            grid.Add(copyRow(win, formatHex(cert.SubjectKeyId, p.UI.HexSep)))
+            grid.Add(copyRow(win, certs.FormatHex(cert.SubjectKeyId, string(p.UI.HexSep))))
         }
         if len(cert.AuthorityKeyId) > 0 {
             grid.Add(boldLabel("Authority Key Identifier"))
-            grid.Add(copyRow(win, formatHex(cert.AuthorityKeyId, p.UI.HexSep)))
+            grid.Add(copyRow(win, certs.FormatHex(cert.AuthorityKeyId, string(p.UI.HexSep))))
         }
         chainTabs.Append(container.NewTabItem(title, container.NewVScroll(grid)))
     }
@@ -435,7 +452,7 @@ func buildAndRenderChain(win fyne.Window, chainTabs *container.AppTabs, leaf *x5
         chainTabs.Refresh()
         // Check local roots first, then CCADB
         if len(c.SubjectKeyId) > 0 {
-            key := normalizeHex(c.SubjectKeyId)
+            key := certs.NormalizeHexBytesNoSepUpper(c.SubjectKeyId)
             if _, ok := localSet[key]; ok {
                 chainTabs.Append(container.NewTabItem("Root (from Local Store)", widget.NewLabel("Found Subject Key Identifier in local system trust bundle")))
                 chainTabs.Refresh()
@@ -528,123 +545,102 @@ func showCCADBDialog(win fyne.Window, p prefs.Preferences) {
     d.Show()
 }
 
-func extractNameAttributes(attrs []pkix.AttributeTypeAndValue, style prefs.NameStyle, prefix string) [][]string {
-	pairs := [][]string{}
-	for _, atv := range attrs {
-        name := mapOIDToName(atv.Type, style)
-		value := fmt.Sprintf("%v", atv.Value)
-        label := name
-        if prefix != "" {
-            label = fmt.Sprintf("%s %s", prefix, name)
+// buildAdvancedComparison populates the Advanced tab with three sections:
+// Local only, CCADB only, and Both (by SKI), listing Subject (bold), SKI, Serial.
+func buildAdvancedComparison(containerRoot *fyne.Container, p prefs.Preferences) {
+    containerRoot.Objects = nil
+    // Headers
+    addHeader := func(title string) {
+        lbl := widget.NewLabel(title)
+        lbl.TextStyle = fyne.TextStyle{Bold: true}
+        // Light gray background row
+        bg := canvas.NewRectangle(color.NRGBA{R: 240, G: 240, B: 240, A: 255})
+        // Ensure background stretches
+        row := container.NewMax(bg, container.NewPadded(lbl))
+        containerRoot.Add(row)
+    }
+    addEntry := func(subject, ski, serial string) {
+        // Subject bold
+        subj := widget.NewLabel(subject)
+        subj.TextStyle = fyne.TextStyle{Bold: true}
+        containerRoot.Add(subj)
+        // Minimal vertical spacing rows
+        containerRoot.Add(widget.NewLabel("SKI: " + ski))
+        if serial != "" {
+            containerRoot.Add(widget.NewLabel("Serial: " + serial))
         }
-        pairs = append(pairs, []string{label, value})
-	}
-	return pairs
-}
+        // Single blank line between certificates
+        containerRoot.Add(widget.NewLabel(""))
+    }
+    // Load data
+    localMap, lerr := resources.LoadLocalRootsSKISet()
+    ccadbSummary, cerr := resources.LoadCCADBSummary()
+    if lerr != nil {
+        containerRoot.Add(widget.NewLabel("Error loading local roots: "+lerr.Error()))
+    }
+    if cerr != nil {
+        containerRoot.Add(widget.NewLabel("Error loading CCADB set: "+cerr.Error()))
+    }
 
-func mapOIDToName(oid asn1.ObjectIdentifier, style prefs.NameStyle) string {
-	// Common OIDs for Subject/Issuer attributes
-    oidStr := oidToString(oid)
-	var openssl = map[string]string{
-		"2.5.4.3":  "CN",
-		"2.5.4.6":  "C",
-		"2.5.4.7":  "L",
-		"2.5.4.8":  "ST",
-		"2.5.4.10": "O",
-		"2.5.4.11": "OU",
-		"1.2.840.113549.1.9.1": "emailAddress",
-		"2.5.4.9":  "street",
-		"2.5.4.17": "postalCode",
-		"0.9.2342.19200300.100.1.25": "DC",
-		"2.5.4.5":  "serialNumber",
-	}
-	var windows = map[string]string{
-		"2.5.4.3":  "Common Name",
-		"2.5.4.6":  "Country",
-		"2.5.4.7":  "Locality",
-		"2.5.4.8":  "State/Province",
-		"2.5.4.10": "Organization",
-		"2.5.4.11": "Organizational Unit",
-		"1.2.840.113549.1.9.1": "E-Mail",
-		"2.5.4.9":  "Street",
-		"2.5.4.17": "Postal Code",
-		"0.9.2342.19200300.100.1.25": "Domain Component",
-		"2.5.4.5":  "Serial Number",
-	}
-	if style == prefs.Windows {
-        if v, ok := windows[oidStr]; ok {
-			return v
-		}
-        return oidStr
-	}
-    if v, ok := openssl[oidStr]; ok {
-		return v
-	}
-    return oidStr
-}
+    // Compute sets
+    localOnly := []resources.LocalRootSummary{}
+    both := []resources.LocalRootSummary{}
+    ccadbOnly := []struct{ Subject string; SKI string }{}
 
-func oidToString(oid asn1.ObjectIdentifier) string {
-    parts := make([]string, len(oid))
-    for i, n := range oid {
-		parts[i] = fmt.Sprintf("%d", n)
-	}
-	return strings.Join(parts, ".")
-}
-
-func keyUsageNames(ku x509.KeyUsage) string {
-    names := []string{}
-    if ku&x509.KeyUsageDigitalSignature != 0 { names = append(names, "Digital Signature") }
-    if ku&x509.KeyUsageContentCommitment != 0 { names = append(names, "Non Repudiation") }
-    if ku&x509.KeyUsageKeyEncipherment != 0 { names = append(names, "Key Encipherment") }
-    if ku&x509.KeyUsageDataEncipherment != 0 { names = append(names, "Data Encipherment") }
-    if ku&x509.KeyUsageKeyAgreement != 0 { names = append(names, "Key Agreement") }
-    if ku&x509.KeyUsageCertSign != 0 { names = append(names, "Certificate Sign") }
-    if ku&x509.KeyUsageCRLSign != 0 { names = append(names, "CRL Sign") }
-    if ku&x509.KeyUsageEncipherOnly != 0 { names = append(names, "Encipher Only") }
-    if ku&x509.KeyUsageDecipherOnly != 0 { names = append(names, "Decipher Only") }
-    return strings.Join(names, ", ")
-}
-
-func extKeyUsageNames(usages []x509.ExtKeyUsage) string {
-    if len(usages) == 0 { return "" }
-    names := make([]string, 0, len(usages))
-    for _, u := range usages {
-        switch u {
-        case x509.ExtKeyUsageAny: names = append(names, "Any")
-        case x509.ExtKeyUsageServerAuth: names = append(names, "TLS Web Server Authentication")
-        case x509.ExtKeyUsageClientAuth: names = append(names, "TLS Web Client Authentication")
-        case x509.ExtKeyUsageCodeSigning: names = append(names, "Code Signing")
-        case x509.ExtKeyUsageEmailProtection: names = append(names, "E-mail Protection")
-        case x509.ExtKeyUsageIPSECEndSystem: names = append(names, "IPSec End System")
-        case x509.ExtKeyUsageIPSECTunnel: names = append(names, "IPSec Tunnel")
-        case x509.ExtKeyUsageIPSECUser: names = append(names, "IPSec User")
-        case x509.ExtKeyUsageTimeStamping: names = append(names, "Time Stamping")
-        case x509.ExtKeyUsageOCSPSigning: names = append(names, "OCSP Signing")
-        case x509.ExtKeyUsageMicrosoftServerGatedCrypto: names = append(names, "Microsoft Server Gated Crypto")
-        case x509.ExtKeyUsageNetscapeServerGatedCrypto: names = append(names, "Netscape Server Gated Crypto")
-        case x509.ExtKeyUsageMicrosoftCommercialCodeSigning: names = append(names, "Microsoft Commercial Code Signing")
-        case x509.ExtKeyUsageMicrosoftKernelCodeSigning: names = append(names, "Microsoft Kernel Code Signing")
-        default:
-            names = append(names, fmt.Sprintf("Unknown (%d)", u))
+    for ski, sum := range localMap {
+        if _, ok := ccadbSummary[ski]; ok {
+            both = append(both, sum)
+        } else {
+            localOnly = append(localOnly, sum)
         }
     }
-    return strings.Join(names, ", ")
+    now := time.Now().UTC()
+    for ski, summary := range ccadbSummary {
+        if _, ok := localMap[ski]; ok {
+            continue
+        }
+        // Skip expired
+        if !summary.NotAfter.IsZero() && summary.NotAfter.Before(now) {
+            continue
+        }
+        ccadbOnly = append(ccadbOnly, struct{ Subject string; SKI string }{Subject: summary.Subject, SKI: ski})
+    }
+
+    // Render sections
+    addHeader("Certificates in Local Store Only")
+    for _, s := range localOnly {
+        addEntry(s.Subject, s.SubjectKeyIdentifier, s.SerialHex)
+    }
+    if len(localOnly) == 0 {
+        containerRoot.Add(widget.NewLabel("(none)"))
+    } else {
+        containerRoot.Add(widget.NewLabel(fmt.Sprintf("(%d)", len(localOnly))))
+    }
+    if p.UI.ShowCCADBOnlyCerts {
+        addHeader("Certificates in CCADB Only")
+        for _, row := range ccadbOnly {
+            subj := row.Subject
+            if subj == "" { subj = "(unknown subject)" }
+            addEntry(subj, row.SKI, "")
+        }
+        if len(ccadbOnly) == 0 {
+            containerRoot.Add(widget.NewLabel("(none)"))
+        } else {
+            containerRoot.Add(widget.NewLabel(fmt.Sprintf("(%d)", len(ccadbOnly))))
+        }
+    }
+    addHeader("Certificates in Both")
+    for _, s := range both {
+        addEntry(s.Subject, s.SubjectKeyIdentifier, s.SerialHex)
+    }
+    if len(both) == 0 {
+        containerRoot.Add(widget.NewLabel("(none)"))
+    } else {
+        containerRoot.Add(widget.NewLabel(fmt.Sprintf("(%d)", len(both))))
+    }
+    containerRoot.Refresh()
 }
 
-func nistCurveName(oidOrName string) string {
-    // The Go stdlib exposes curve param Name already as a friendly string (e.g., P-256)
-    // For completeness we pass-through here.
-    switch oidOrName {
-    case "P-256", "prime256v1":
-        return "P-256"
-    case "P-384", "secp384r1":
-        return "P-384"
-    case "P-521", "secp521r1":
-        return "P-521"
-    default:
-        return oidOrName
-    }
-}
 
 // boldLabel returns a name label with bold style.
 func boldLabel(text string) *widget.Label {

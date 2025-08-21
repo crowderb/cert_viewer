@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"crypto/x509"
+	"math/big"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -22,6 +23,7 @@ const defaultLinuxBundle = "/etc/ssl/certs/ca-certificates.crt"
 type LocalRootSummary struct {
 	Subject               string `json:"subject"`
 	SubjectKeyIdentifier  string `json:"subjectKeyIdentifier"`
+    SerialHex             string `json:"serialHex"`
 	NotBefore             string `json:"notBefore"`
 	NotAfter              string `json:"notAfter"`
 	SHA256FingerprintHex  string `json:"sha256"`
@@ -48,11 +50,16 @@ func EnsureLocalRootsJSON(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(path); err == nil {
-		return nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
+    if _, err := os.Stat(path); err == nil {
+        // If exists, ensure it has SerialHex; if missing, regenerate
+        if needsRegen(path) {
+            // proceed to rebuild below
+        } else {
+            return nil
+        }
+    } else if !errors.Is(err, os.ErrNotExist) {
+        return err
+    }
 	// Try default Linux bundle
 	bundle := defaultLinuxBundle
 	f, err := os.Open(bundle)
@@ -83,9 +90,10 @@ func EnsureLocalRootsJSON(ctx context.Context) error {
 			continue
 		}
 		sha := sha256.Sum256(cert.Raw)
-		summary := LocalRootSummary{
+        summary := LocalRootSummary{
 			Subject:              cert.Subject.String(),
 			SubjectKeyIdentifier: hex.EncodeToString(cert.SubjectKeyId),
+            SerialHex:            upperNoSep(cert.SerialNumber),
 			NotBefore:            cert.NotBefore.Format("2006-01-02 15:04:05 MST"),
 			NotAfter:             cert.NotAfter.Format("2006-01-02 15:04:05 MST"),
 			SHA256FingerprintHex: hex.EncodeToString(sha[:]),
@@ -106,6 +114,31 @@ func writeLocalRoots(path string, content localRootsFile) error {
 		return err
 	}
 	return os.WriteFile(path, b, 0o644)
+}
+
+func needsRegen(path string) bool {
+    b, err := os.ReadFile(path)
+    if err != nil { return true }
+    var f localRootsFile
+    if err := json.Unmarshal(b, &f); err != nil { return true }
+    if len(f.Roots) == 0 { return false }
+    // If first entry has empty SerialHex, assume legacy and regenerate
+    return f.Roots[0].SerialHex == ""
+}
+
+func upperNoSep(n *big.Int) string {
+    if n == nil { return "" }
+    s := n.Text(16)
+    // pad even length
+    if len(s)%2 == 1 { s = "0" + s }
+    // uppercase
+    out := make([]byte, len(s))
+    for i := 0; i < len(s); i++ {
+        c := s[i]
+        if c >= 'a' && c <= 'f' { c = c - ('a' - 'A') }
+        out[i] = c
+    }
+    return string(out)
 }
 
 // LoadLocalRootsSKISet loads local_roots.json and returns a map of normalized SKI -> summary

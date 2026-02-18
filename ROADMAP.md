@@ -42,11 +42,11 @@ for sustainable development.
 
 ### Refactoring
 
-- [ ] Remove dead code: `escapeMarkdown()` in `cmd/cert_viewer/main.go` (never called)
-- [ ] Consolidate duplicate hex formatting — `formatHex()` and `formatSerialWithSep()`
+- [x] Remove dead code: `escapeMarkdown()` in `cmd/cert_viewer/main.go` (never called)
+- [x] Consolidate duplicate hex formatting — `formatHex()` and `formatSerialWithSep()`
   in `main.go` duplicate logic from `internal/certs/format.go`; make `main.go` call
   the `certs` package versions
-- [ ] Refactor `main.go` — extract UI rendering functions into `internal/ui/` packages:
+- [x] Refactor `main.go` — extract UI rendering functions into `internal/ui/` packages:
   - `internal/ui/summary/` — `refreshSummaryAndDetails()` rendering logic
   - `internal/ui/chain/` — `buildAndRenderChain()` and `tryParseSingleCert()`
   - `internal/ui/advanced/` — `buildAdvancedComparison()` rendering
@@ -182,3 +182,7 @@ _Items will be moved here when done. Include the date and a short note._
 - [x] **2026-02-18** — Phase 1 testing: added unit tests for all internal packages
   (`internal/certs`, `internal/prefs`, `internal/resources`). Coverage: certs 100%,
   prefs 82.6%, resources 83.3%. Promoted testify to direct dependency.
+- [x] **2026-02-18** — Phase 1 refactoring: removed dead code (`escapeMarkdown`, `formatHex`,
+  `normalizeHex`), consolidated duplicate helpers (`formatSerialWithSep`), and extracted
+  all UI rendering from `main.go` into `internal/ui/{summary,chain,advanced,dialogs}` sub-packages.
+  `main.go` reduced from 723 lines to ~165 lines.

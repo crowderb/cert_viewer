@@ -59,6 +59,36 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 - [ ] Validation mirrors `prefs.Load()` rules: empty CCADB URL → reset to default;
   RefreshDays ≤ 0 → reset to 30
 
+### CCADB Version Auto-Discovery
+
+The CCADB periodically increments the CSV format version (currently `v2`, may become
+`v3`, `v4`, etc.). The download URL and local cache filename must track the latest
+version automatically rather than requiring a manual preference update.
+
+Current state: URL is hardcoded as
+`https://ccadb.my.salesforce-sites.com/ccadb/AllCertificateRecordsCSVFormatv2` in
+`prefs.Default()` (`internal/prefs/prefs.go:51`) and cache filename is the constant
+`ccadb_all_certificate_records_v2.csv` in `internal/resources/fetcher.go:19`.
+
+- [ ] During each CCADB refresh cycle (`EnsureCCADBCSV` in `internal/resources/fetcher.go`),
+  fetch `https://www.ccadb.org/resources` and parse the HTML to extract the current
+  "All Certificate Records" CSV download URL (look for an `<a href>` whose text or
+  `href` matches the pattern `AllCertificateRecordsCSVFormat` or similar)
+- [ ] Compare the discovered URL against `p.Resources.CCADBURL`; if they differ, update
+  `prefs.CCADBURL` and call `prefs.Save()` before downloading, so future refreshes use
+  the new URL without user intervention
+- [ ] Derive the local cache filename dynamically from the URL path segment (e.g., extract
+  `AllCertificateRecordsCSVFormatv3` → `ccadb_all_certificate_records_v3.csv`) instead
+  of using the hardcoded `ccadbCachedName` constant; store the active filename in prefs
+  or derive it at runtime from the saved URL
+- [ ] When the filename changes between versions, delete (or ignore) the stale
+  `v2`-named cache file so the new version is fetched fresh
+- [ ] If the `https://www.ccadb.org/resources` page is unreachable, fall back gracefully
+  to the URL already stored in `p.Resources.CCADBURL` and log a warning rather than
+  blocking the refresh
+- [ ] Add a unit test in `internal/resources/fetcher_test.go` that mocks the resources
+  page HTML and verifies correct URL extraction and filename derivation
+
 ### PKCS#7 Support in AIA Downloads
 
 - [ ] In `tryParseSingleCert()` (chain builder), detect PKCS#7/CMS `Content-Type`

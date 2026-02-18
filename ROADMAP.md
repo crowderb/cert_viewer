@@ -96,12 +96,12 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### Advanced Tab: Local-Only Certificate Count Color-Coding
 
-- [ ] In the "Certificates in Local Store Only" section of the Advanced tab, color the
+- [x] In the "Certificates in Local Store Only" section of the Advanced tab, color the
   count/status indicator based on whether any local-only certs are present:
   - Green text if the count is zero ("(none)") — local store is fully covered by CCADB
   - Red text if one or more certificates are found locally but not in CCADB — signals
     certs that are trusted locally but not tracked in the common authority database
-- [ ] Implementation in `internal/ui/advanced/advanced.go`: replace the plain
+- [x] Implementation in `internal/ui/advanced/advanced.go`: replace the plain
   `widget.NewLabel("(none)")` / `widget.NewLabel(fmt.Sprintf("(%d)", ...))` calls with
   `canvas.NewText(...)` using `color.NRGBA` for green (e.g. `{R:0, G:180, B:0, A:255}`)
   and red (e.g. `{R:200, G:0, B:0, A:255}`)

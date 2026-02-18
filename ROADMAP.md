@@ -1,57 +1,10 @@
 # Roadmap
 
-Items are organized into four phases in rough priority order. Phases are not strictly
+Items are organized into phases in rough priority order. Phases are not strictly
 sequential — items within a phase can be worked in any order. Use this file to track
 planned work and archive completed items over time.
 
----
-
-## Phase 1 — Foundation (Testing & Refactoring)
-
-These items improve the stability and maintainability of the existing codebase before
-adding significant new functionality. They have no user-visible impact but are critical
-for sustainable development.
-
-### Testing
-
-- [x] Add `testify` as a **direct** dependency in `go.mod` (currently only indirect)
-- [x] Unit tests for `internal/certs/format.go`
-  - `FormatHex()` — all three separator modes, empty input, odd-length input
-  - `FormatSerialWithSep()` — leading-zero preservation, zero value, large serial
-  - `MapOIDToName()` — known OIDs in both name styles, unknown OID passthrough
-  - `ExtractNameAttributes()` — multi-value RDNs, empty input
-  - `KeyUsageNames()` / `ExtKeyUsageNames()` — all flag combinations
-  - `NISTCurveName()` — known and unknown curve names
-- [x] Unit tests for `internal/certs/parser.go`
-  - Valid PEM (single cert, multi-block bundle)
-  - Valid DER
-  - Invalid / empty input error handling
-  - PEM block with wrong type (non-CERTIFICATE block)
-- [x] Unit tests for `internal/prefs/prefs.go`
-  - `Default()` returns all expected fields
-  - `Load()` round-trips through `Save()`
-  - `Load()` falls back to defaults for missing or invalid fields
-  - `Load()` returns defaults when file does not exist
-- [x] Unit tests for `internal/resources/fetcher.go`
-  - `parseSKIToUpperHex()` — colon-separated hex, space-separated hex, base64, empty
-  - `parseCCADBDate()` — all supported layouts, invalid input
-  - `LoadCCADBSKISet()` / `LoadCCADBSummary()` — mock CSV input covering edge cases
-- [x] Unit tests for `internal/resources/localroots.go`
-  - `needsRegen()` — legacy JSON detection
-  - JSON generation from a synthetic PEM bundle (no filesystem dependency)
-
-### Refactoring
-
-- [x] Remove dead code: `escapeMarkdown()` in `cmd/cert_viewer/main.go` (never called)
-- [x] Consolidate duplicate hex formatting — `formatHex()` and `formatSerialWithSep()`
-  in `main.go` duplicate logic from `internal/certs/format.go`; make `main.go` call
-  the `certs` package versions
-- [x] Refactor `main.go` — extract UI rendering functions into `internal/ui/` packages:
-  - `internal/ui/summary/` — `refreshSummaryAndDetails()` rendering logic
-  - `internal/ui/chain/` — `buildAndRenderChain()` and `tryParseSingleCert()`
-  - `internal/ui/advanced/` — `buildAdvancedComparison()` rendering
-  - `internal/ui/dialogs/` — preferences dialog, CCADB status dialog
-  - Leave `main()` as a thin wiring layer (window setup, menu, event routing)
+Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ---
 
@@ -100,7 +53,7 @@ for sustainable development.
 
 ### Asynchronous Chain Building
 
-- [ ] Move `buildAndRenderChain()` HTTP fetches off the UI goroutine
+- [ ] Move `chain.Build()` HTTP fetches off the UI goroutine
 - [ ] Show a progress indicator (spinner or status label) while chain is being built
 - [ ] Allow cancellation if the user opens a different certificate mid-build
 - [ ] Display partial chain if any intermediate fetch fails (currently stops at first error)
@@ -141,6 +94,18 @@ for sustainable development.
   (or on demand via a button to avoid latency on every open)
 - [ ] Display: Good / Revoked (with revocation time and reason) / Unknown / Error
 
+### Advanced Tab: Local-Only Certificate Count Color-Coding
+
+- [ ] In the "Certificates in Local Store Only" section of the Advanced tab, color the
+  count/status indicator based on whether any local-only certs are present:
+  - Green text if the count is zero ("(none)") — local store is fully covered by CCADB
+  - Red text if one or more certificates are found locally but not in CCADB — signals
+    certs that are trusted locally but not tracked in the common authority database
+- [ ] Implementation in `internal/ui/advanced/advanced.go`: replace the plain
+  `widget.NewLabel("(none)")` / `widget.NewLabel(fmt.Sprintf("(%d)", ...))` calls with
+  `canvas.NewText(...)` using `color.NRGBA` for green (e.g. `{R:0, G:180, B:0, A:255}`)
+  and red (e.g. `{R:200, G:0, B:0, A:255}`)
+
 ### Validity Color-Coding
 
 - [ ] Color the "Not After" / "Valid To" field red if the certificate is expired
@@ -175,14 +140,9 @@ for sustainable development.
 
 ## Completed
 
-_Items will be moved here when done. Include the date and a short note._
+_Summary of completed phases. Full details in [docs/roadmaps/](docs/roadmaps/)._
 
-- [x] **2026-02-18** — Added CLAUDE.md, ROADMAP.md, rewrote TECHNOLOGY.md, and updated
-  README.md to establish a Claude Code-idiomatic development workflow for ongoing feature work.
-- [x] **2026-02-18** — Phase 1 testing: added unit tests for all internal packages
-  (`internal/certs`, `internal/prefs`, `internal/resources`). Coverage: certs 100%,
-  prefs 82.6%, resources 83.3%. Promoted testify to direct dependency.
-- [x] **2026-02-18** — Phase 1 refactoring: removed dead code (`escapeMarkdown`, `formatHex`,
-  `normalizeHex`), consolidated duplicate helpers (`formatSerialWithSep`), and extracted
-  all UI rendering from `main.go` into `internal/ui/{summary,chain,advanced,dialogs}` sub-packages.
-  `main.go` reduced from 723 lines to ~165 lines.
+- **2026-Q1** ([archive](docs/roadmaps/2026-Q1.md)) — Phase 1 Foundation complete:
+  project setup (CLAUDE.md, ROADMAP.md, TECHNOLOGY.md, README.md), unit test suite
+  (certs 100%, prefs 82.6%, resources 83.3%), and full refactoring of `main.go` into
+  `internal/ui/` sub-packages.

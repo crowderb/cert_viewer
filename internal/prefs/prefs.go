@@ -6,6 +6,7 @@ import (
     "fmt"
     "os"
     "path/filepath"
+    "strings"
 )
 
 type NameStyle string
@@ -30,8 +31,25 @@ type UISettings struct {
 }
 
 type Resources struct {
-    CCADBURL    string `json:"ccadb_org_root_intermediate_certs_csv_url"`
-    RefreshDays int    `json:"refresh_days"`
+    CCadbResourcesURL string `json:"ccadb_resources_url"`                           // page to discover the latest CSV download URL
+    CCADBURL          string `json:"ccadb_org_root_intermediate_certs_csv_url"`      // discovered CSV download URL
+    RefreshDays       int    `json:"refresh_days"`
+    CachedFilename    string `json:"cached_filename"`
+}
+
+// CacheFilenameFromURL derives the local cache filename from the CCADB download URL.
+// It takes the last path segment of the URL, lowercases it, and appends ".csv".
+// e.g. "...AllCertificateRecordsCSVFormatv2" → "allcertificaterecordscsvformatv2.csv"
+func CacheFilenameFromURL(rawURL string) string {
+    idx := strings.LastIndex(rawURL, "/")
+    seg := rawURL
+    if idx >= 0 {
+        seg = rawURL[idx+1:]
+    }
+    if seg == "" {
+        return "ccadb_cache.csv"
+    }
+    return strings.ToLower(seg) + ".csv"
 }
 
 type Preferences struct {
@@ -40,16 +58,20 @@ type Preferences struct {
 }
 
 func Default() Preferences {
+    const resourcesURL = "https://www.ccadb.org/resources"
+    const defaultCSVURL = "https://ccadb.my.salesforce-sites.com/ccadb/AllCertificateRecordsCSVFormatv2"
     return Preferences{
         UI: UISettings{
-            NameStyle: OpenSSL,
-            HexSep:    HexColon,
-            LastDir:   "",
+            NameStyle:          OpenSSL,
+            HexSep:             HexColon,
+            LastDir:            "",
             ShowCCADBOnlyCerts: false,
         },
         Resources: Resources{
-            CCADBURL:    "https://ccadb.my.salesforce-sites.com/ccadb/AllCertificateRecordsCSVFormatv2",
-            RefreshDays: 30,
+            CCadbResourcesURL: resourcesURL,
+            CCADBURL:          defaultCSVURL,
+            RefreshDays:       30,
+            CachedFilename:    CacheFilenameFromURL(defaultCSVURL),
         },
     }
 }
@@ -85,8 +107,14 @@ func Load() (Preferences, error) {
     if p.Resources.RefreshDays <= 0 {
         p.Resources.RefreshDays = 30
     }
+    if p.Resources.CCadbResourcesURL == "" {
+        p.Resources.CCadbResourcesURL = Default().Resources.CCadbResourcesURL
+    }
     if p.Resources.CCADBURL == "" {
         p.Resources.CCADBURL = Default().Resources.CCADBURL
+    }
+    if p.Resources.CachedFilename == "" {
+        p.Resources.CachedFilename = CacheFilenameFromURL(p.Resources.CCADBURL)
     }
     return p, nil
 }

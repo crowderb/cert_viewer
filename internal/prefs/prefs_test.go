@@ -26,12 +26,33 @@ func TestDefault(t *testing.T) {
 	assert.Equal(t, "", d.UI.LastDir)
 	assert.False(t, d.UI.ShowCCADBOnlyCerts)
 	assert.Equal(t, 30, d.Resources.RefreshDays)
+	assert.NotEmpty(t, d.Resources.CCadbResourcesURL)
 	assert.NotEmpty(t, d.Resources.CCADBURL)
+	assert.Equal(t, CacheFilenameFromURL(d.Resources.CCADBURL), d.Resources.CachedFilename)
 
 	// Mutations to one returned value must not affect a subsequent call.
 	d.UI.NameStyle = Windows
 	d2 := Default()
 	assert.Equal(t, OpenSSL, d2.UI.NameStyle)
+}
+
+func TestCacheFilenameFromURL(t *testing.T) {
+	tests := []struct {
+		name  string
+		url   string
+		want  string
+	}{
+		{"v2 URL", "https://ccadb.my.salesforce-sites.com/ccadb/AllCertificateRecordsCSVFormatv2", "allcertificaterecordscsvformatv2.csv"},
+		{"v3 URL", "https://ccadb.my.salesforce-sites.com/ccadb/AllCertificateRecordsCSVFormatv3", "allcertificaterecordscsvformatv3.csv"},
+		{"URL with no path segment", "https://example.com", "example.com.csv"},
+		{"URL ending in slash", "https://example.com/", "ccadb_cache.csv"},
+		{"mixed case segment", "https://example.com/SomeName", "somename.csv"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, CacheFilenameFromURL(tc.url))
+		})
+	}
 }
 
 func TestLoad_NoFile(t *testing.T) {
@@ -82,10 +103,24 @@ func TestLoad_Validation(t *testing.T) {
 			func(t *testing.T, p Preferences) { assert.Equal(t, 30, p.Resources.RefreshDays) },
 		},
 		{
+			"empty CCadbResourcesURL resets to default",
+			func(p *Preferences) { p.Resources.CCadbResourcesURL = "" },
+			func(t *testing.T, p Preferences) {
+				assert.Equal(t, Default().Resources.CCadbResourcesURL, p.Resources.CCadbResourcesURL)
+			},
+		},
+		{
 			"empty CCADBURL resets to default",
 			func(p *Preferences) { p.Resources.CCADBURL = "" },
 			func(t *testing.T, p Preferences) {
 				assert.Equal(t, Default().Resources.CCADBURL, p.Resources.CCADBURL)
+			},
+		},
+		{
+			"empty CachedFilename is derived from CCADBURL",
+			func(p *Preferences) { p.Resources.CachedFilename = "" },
+			func(t *testing.T, p Preferences) {
+				assert.Equal(t, CacheFilenameFromURL(p.Resources.CCADBURL), p.Resources.CachedFilename)
 			},
 		},
 		{

@@ -43,6 +43,22 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ## Phase 3 — Core Feature Gaps
 
+### Preferences: Editable CCADB URL and Refresh Interval
+
+- [ ] Extend the Preferences dialog (Edit → Preferences) with a "Resources" section
+  containing two editable fields:
+  - **CCADB URL** — text entry pre-populated from `prefs.Preferences.Resources.CCADBURL`;
+    saved back to `preferences.json` on confirm; validated to be non-empty (resets to
+    default if cleared)
+  - **Refresh Days** — numeric entry pre-populated from
+    `prefs.Preferences.Resources.RefreshDays`; controls how many days the cached CSV is
+    considered fresh before a background re-download is triggered
+- [ ] Implementation in `internal/ui/dialogs/dialogs.go` (`ShowPreferences`): add a
+  `widget.Separator` and two `widget.Entry` fields below the existing hex-separator radio
+  group; bind the `onApply` callback to persist both values via `prefs.Save`
+- [ ] Validation mirrors `prefs.Load()` rules: empty CCADB URL → reset to default;
+  RefreshDays ≤ 0 → reset to 30
+
 ### PKCS#7 Support in AIA Downloads
 
 - [ ] In `tryParseSingleCert()` (chain builder), detect PKCS#7/CMS `Content-Type`

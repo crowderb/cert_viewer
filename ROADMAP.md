@@ -14,29 +14,29 @@ for sustainable development.
 
 ### Testing
 
-- [ ] Add `testify` as a **direct** dependency in `go.mod` (currently only indirect)
-- [ ] Unit tests for `internal/certs/format.go`
+- [x] Add `testify` as a **direct** dependency in `go.mod` (currently only indirect)
+- [x] Unit tests for `internal/certs/format.go`
   - `FormatHex()` — all three separator modes, empty input, odd-length input
   - `FormatSerialWithSep()` — leading-zero preservation, zero value, large serial
   - `MapOIDToName()` — known OIDs in both name styles, unknown OID passthrough
   - `ExtractNameAttributes()` — multi-value RDNs, empty input
   - `KeyUsageNames()` / `ExtKeyUsageNames()` — all flag combinations
   - `NISTCurveName()` — known and unknown curve names
-- [ ] Unit tests for `internal/certs/parser.go`
+- [x] Unit tests for `internal/certs/parser.go`
   - Valid PEM (single cert, multi-block bundle)
   - Valid DER
   - Invalid / empty input error handling
   - PEM block with wrong type (non-CERTIFICATE block)
-- [ ] Unit tests for `internal/prefs/prefs.go`
+- [x] Unit tests for `internal/prefs/prefs.go`
   - `Default()` returns all expected fields
   - `Load()` round-trips through `Save()`
   - `Load()` falls back to defaults for missing or invalid fields
   - `Load()` returns defaults when file does not exist
-- [ ] Unit tests for `internal/resources/fetcher.go`
+- [x] Unit tests for `internal/resources/fetcher.go`
   - `parseSKIToUpperHex()` — colon-separated hex, space-separated hex, base64, empty
   - `parseCCADBDate()` — all supported layouts, invalid input
   - `LoadCCADBSKISet()` / `LoadCCADBSummary()` — mock CSV input covering edge cases
-- [ ] Unit tests for `internal/resources/localroots.go`
+- [x] Unit tests for `internal/resources/localroots.go`
   - `needsRegen()` — legacy JSON detection
   - JSON generation from a synthetic PEM bundle (no filesystem dependency)
 
@@ -179,3 +179,6 @@ _Items will be moved here when done. Include the date and a short note._
 
 - [x] **2026-02-18** — Added CLAUDE.md, ROADMAP.md, rewrote TECHNOLOGY.md, and updated
   README.md to establish a Claude Code-idiomatic development workflow for ongoing feature work.
+- [x] **2026-02-18** — Phase 1 testing: added unit tests for all internal packages
+  (`internal/certs`, `internal/prefs`, `internal/resources`). Coverage: certs 100%,
+  prefs 82.6%, resources 83.3%. Promoted testify to direct dependency.

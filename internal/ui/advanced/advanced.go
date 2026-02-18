@@ -83,9 +83,11 @@ func Build(containerRoot *fyne.Container, p prefs.Preferences) {
 		addEntry(s.Subject, s.SubjectKeyIdentifier, s.SerialHex)
 	}
 	if len(localOnly) == 0 {
-		containerRoot.Add(widget.NewLabel("(none)"))
+		t := canvas.NewText("(none)", color.NRGBA{R: 0, G: 180, B: 0, A: 255})
+		containerRoot.Add(t)
 	} else {
-		containerRoot.Add(widget.NewLabel(fmt.Sprintf("(%d)", len(localOnly))))
+		t := canvas.NewText(fmt.Sprintf("(%d)", len(localOnly)), color.NRGBA{R: 200, G: 0, B: 0, A: 255})
+		containerRoot.Add(t)
 	}
 	if p.UI.ShowCCADBOnlyCerts {
 		addHeader("Certificates in CCADB Only")

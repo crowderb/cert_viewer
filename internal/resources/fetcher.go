@@ -2,25 +2,57 @@ package resources
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/csv"
 	"errors"
 	"fmt"
 	"io"
-	"encoding/csv"
-	"encoding/base64"
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
-    "strings"
 
-    "cert_viewer/internal/prefs"
+	"cert_viewer/internal/prefs"
 )
 
-const ccadbCachedName = "ccadb_all_certificate_records_v2.csv"
+// ccadbCSVURLRE matches the full CCADB CSV download URL inside an HTML page.
+var ccadbCSVURLRE = regexp.MustCompile(`https?://[^\s"'<>]*AllCertificateRecordsCSVFormat[^\s"'<>]*`)
 
-// EnsureCCADBCSV checks cache staleness and refreshes file in background.
-// It returns immediately. Any download errors are reported via the returned channel
-// if provided; pass nil if you don't need errors.
+// discoverLatestCCADBURL fetches the CCADB resources page at resourcesURL and
+// extracts the current AllCertificateRecordsCSVFormat download URL from its HTML.
+// Returns an error if the page is unreachable or no matching URL is found.
+func discoverLatestCCADBURL(ctx context.Context, resourcesURL string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, resourcesURL, nil)
+	if err != nil {
+		return "", err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("CCADB resources page returned %s", resp.Status)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+	match := ccadbCSVURLRE.Find(body)
+	if match == nil {
+		return "", fmt.Errorf("AllCertificateRecordsCSVFormat URL not found on resources page")
+	}
+	return string(match), nil
+}
+
+// EnsureCCADBCSV checks cache staleness and refreshes the file in the background.
+// On each call it first fetches p.Resources.CCadbResourcesURL to discover the
+// current AllCertificateRecordsCSVFormat download URL; if a new version is found
+// the old cache file is deleted, prefs are updated on disk, and a fresh download
+// is forced. If the resources page is unreachable the stored URL is used as-is.
+// It returns immediately; any error is sent on the returned channel.
 func EnsureCCADBCSV(ctx context.Context, p prefs.Preferences) <-chan error {
 	ch := make(chan error, 1)
 	go func() {
@@ -30,10 +62,39 @@ func EnsureCCADBCSV(ctx context.Context, p prefs.Preferences) <-chan error {
 			ch <- err
 			return
 		}
-		path := filepath.Join(cacheDir, ccadbCachedName)
+
+		prefsChanged := false
+
+		// Step 1: discover the latest CSV download URL from the resources page.
+		resourcesURL := p.Resources.CCadbResourcesURL
+		if resourcesURL == "" {
+			resourcesURL = prefs.Default().Resources.CCadbResourcesURL
+		}
+		if discovered, discErr := discoverLatestCCADBURL(ctx, resourcesURL); discErr == nil {
+			if discovered != p.Resources.CCADBURL {
+				p.Resources.CCADBURL = discovered
+				prefsChanged = true
+			}
+		}
+		// If discovery fails, silently continue with the stored URL.
+
+		// Step 2: sync CachedFilename with current URL; delete old file on version change.
+		newName := prefs.CacheFilenameFromURL(p.Resources.CCADBURL)
+		if p.Resources.CachedFilename != newName {
+			if p.Resources.CachedFilename != "" {
+				_ = os.Remove(filepath.Join(cacheDir, p.Resources.CachedFilename))
+			}
+			p.Resources.CachedFilename = newName
+			prefsChanged = true
+		}
+
+		if prefsChanged {
+			_ = prefs.Save(p)
+		}
+
+		path := filepath.Join(cacheDir, p.Resources.CachedFilename)
 		stale := true
 		if info, err := os.Stat(path); err == nil {
-			// Exists; check age
 			maxAge := time.Duration(p.Resources.RefreshDays) * 24 * time.Hour
 			if time.Since(info.ModTime()) < maxAge {
 				stale = false
@@ -45,7 +106,8 @@ func EnsureCCADBCSV(ctx context.Context, p prefs.Preferences) <-chan error {
 		if !stale {
 			return
 		}
-		// Fetch
+
+		// Step 3: download the file.
 		url := p.Resources.CCADBURL
 		if url == "" {
 			url = prefs.Default().Resources.CCADBURL
@@ -90,19 +152,23 @@ func EnsureCCADBCSV(ctx context.Context, p prefs.Preferences) <-chan error {
 	return ch
 }
 
-// CachePath returns the expected cache location for the CCADB csv.
-func CachePath() (string, error) {
+// CachePath returns the expected cache file path for the CCADB CSV derived from p.
+func CachePath(p prefs.Preferences) (string, error) {
 	d, err := prefs.CacheDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(d, ccadbCachedName), nil
+	name := p.Resources.CachedFilename
+	if name == "" {
+		name = prefs.CacheFilenameFromURL(p.Resources.CCADBURL)
+	}
+	return filepath.Join(d, name), nil
 }
 
 // LoadCCADBSKISet loads the Subject Key Identifier column values from cached CSV.
 // Returns a set of normalized uppercase hex strings without separators.
-func LoadCCADBSKISet() (map[string]struct{}, error) {
-    path, err := CachePath()
+func LoadCCADBSKISet(p prefs.Preferences) (map[string]struct{}, error) {
+    path, err := CachePath(p)
     if err != nil {
         return nil, err
     }
@@ -151,8 +217,8 @@ func LoadCCADBSKISet() (map[string]struct{}, error) {
 
 // LoadCCADBSummary loads CCADB rows and returns a map SKI(hex upper) -> {subject, notAfter}
 // If the CSV is missing columns, best-effort data is returned.
-func LoadCCADBSummary() (map[string]struct{ Subject string; NotAfter time.Time }, error) {
-    path, err := CachePath()
+func LoadCCADBSummary(p prefs.Preferences) (map[string]struct{ Subject string; NotAfter time.Time }, error) {
+    path, err := CachePath(p)
     if err != nil { return nil, err }
     f, err := os.Open(path)
     if err != nil {

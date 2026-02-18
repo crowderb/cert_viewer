@@ -39,7 +39,7 @@ func Build(containerRoot *fyne.Container, p prefs.Preferences) {
 
 	// Load data
 	localMap, lerr := resources.LoadLocalRootsSKISet()
-	ccadbSummary, cerr := resources.LoadCCADBSummary()
+	ccadbSummary, cerr := resources.LoadCCADBSummary(p)
 	if lerr != nil {
 		containerRoot.Add(widget.NewLabel("Error loading local roots: " + lerr.Error()))
 	}

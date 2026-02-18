@@ -44,7 +44,7 @@ func Build(win fyne.Window, chainTabs *container.AppTabs, leaf *x509.Certificate
 
 	// Load local roots and CCADB SKI sets if available
 	localSet, _ := resources.LoadLocalRootsSKISet()
-	ccadbSet, _ := resources.LoadCCADBSKISet()
+	ccadbSet, _ := resources.LoadCCADBSKISet(p)
 	current := leaf
 	for depth := 1; depth <= 5; depth++ {
 		// Self-signed if AKI equals SKI

@@ -177,6 +177,5 @@ for sustainable development.
 
 _Items will be moved here when done. Include the date and a short note._
 
-<!-- Example:
-- [x] **2025-01-15** — Added SHA-1 fingerprint to Summary tab
--->
+- [x] **2026-02-18** — Added CLAUDE.md, ROADMAP.md, rewrote TECHNOLOGY.md, and updated
+  README.md to establish a Claude Code-idiomatic development workflow for ongoing feature work.

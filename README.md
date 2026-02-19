@@ -1,5 +1,7 @@
 # cert_viewer
 
+[![CI](https://github.com/crowderb/cert_viewer/actions/workflows/ci.yml/badge.svg)](https://github.com/crowderb/cert_viewer/actions/workflows/ci.yml)
+
 A cross-platform desktop GUI application written in Go for inspecting X.509 digital
 certificates. Native alternative to `openssl x509 -text` with chain building, root
 trust comparison, and CCADB integration.

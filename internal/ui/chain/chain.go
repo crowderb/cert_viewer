@@ -113,11 +113,5 @@ func fetchRemoteCert(url string) (*x509.Certificate, error) {
 }
 
 func tryParseSingleCert(data []byte) (*x509.Certificate, error) {
-	// Try PEM or DER
-	if cert, err := certs.ParseCertificate(data); err == nil {
-		return cert, nil
-	}
-	// Try simplistic PKCS7 DER decode using x509 to parse any embedded certs is not in stdlib.
-	// As a fallback, attempt to locate BEGIN CERTIFICATE blocks if text.
-	return nil, fmt.Errorf("unsupported format")
+	return certs.ParseCertificateOrPKCS7(data)
 }

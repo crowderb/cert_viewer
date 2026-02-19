@@ -24,10 +24,11 @@ const (
 )
 
 type UISettings struct {
-    NameStyle NameStyle   `json:"nameStyle"`
-    HexSep    HexSeparator `json:"hexSeparator"`
-    LastDir   string       `json:"lastDir"`
-    ShowCCADBOnlyCerts bool `json:"showCCADBOnlyCerts"`
+    NameStyle          NameStyle    `json:"nameStyle"`
+    HexSep             HexSeparator `json:"hexSeparator"`
+    LastDir            string       `json:"lastDir"`
+    ShowCCADBOnlyCerts bool         `json:"showCCADBOnlyCerts"`
+    ExpiryWarnDays     int          `json:"expiryWarnDays"` // 0 on old files → validated to 30
 }
 
 type Resources struct {
@@ -66,6 +67,7 @@ func Default() Preferences {
             HexSep:             HexColon,
             LastDir:            "",
             ShowCCADBOnlyCerts: false,
+            ExpiryWarnDays:     30,
         },
         Resources: Resources{
             CCadbResourcesURL: resourcesURL,
@@ -104,6 +106,9 @@ func Load() (Preferences, error) {
         p.UI.HexSep = HexColon
     }
     // ShowCCADBOnlyCerts defaults to false when missing; no further validation
+    if p.UI.ExpiryWarnDays <= 0 {
+        p.UI.ExpiryWarnDays = 30
+    }
     if p.Resources.RefreshDays <= 0 {
         p.Resources.RefreshDays = 30
     }

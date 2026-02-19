@@ -12,10 +12,12 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### Windows Trust Store
 
-- [ ] Implement Windows system trust store reading using `crypto/x509.SystemCertPool()`
-  or the `golang.org/x/sys/windows` package to enumerate the `ROOT` store
-- [ ] Generate `local_roots.json` equivalent on Windows
-- [ ] Verify "Compare Local vs CCADB" works end-to-end on Windows
+- [x] Implement Windows system trust store reading using `golang.org/x/sys/windows`
+  to enumerate the `ROOT` store via `CertEnumCertificatesInStore`
+- [x] Generate `local_roots.json` equivalent on Windows
+- [x] Verify "Compare Local vs CCADB" works end-to-end on Windows
+
+**Completed 2026-02-18.**
 
 ### macOS Trust Store
 

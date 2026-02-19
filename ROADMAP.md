@@ -21,10 +21,12 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### macOS Trust Store
 
-- [ ] Implement macOS system trust store reading using `crypto/x509.SystemCertPool()`
-  or `security` CLI (`security find-certificate -a -p /System/Library/...`)
-- [ ] Generate `local_roots.json` equivalent on macOS
-- [ ] Verify "Compare Local vs CCADB" works end-to-end on macOS
+- [x] Implement macOS system trust store reading using `security` CLI
+  (`security find-certificate -a -p /System/Library/Keychains/SystemRootCertificates.keychain`)
+- [x] Generate `local_roots.json` equivalent on macOS
+- [x] Verify "Compare Local vs CCADB" works end-to-end on macOS
+
+**Completed 2026-02-18.**
 
 ### GitHub Actions CI / Release Pipeline
 

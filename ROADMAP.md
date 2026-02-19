@@ -26,12 +26,14 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### GitHub Actions CI / Release Pipeline
 
-- [ ] Add `.github/workflows/ci.yml` — run `go test ./...` on push/PR for Linux
-- [ ] Add `.github/workflows/release.yml` — build release artifacts on tag push:
+- [x] Add `.github/workflows/ci.yml` — run `go test ./...` on push/PR for Linux
+- [x] Add `.github/workflows/release.yml` — build release artifacts on tag push:
   - `cert_viewer-linux-amd64`
   - `cert_viewer-windows-amd64.exe` (cross-compile via `GOOS=windows`)
   - `cert_viewer-darwin-amd64` and `cert_viewer-darwin-arm64`
-- [ ] Add `README.md` build status badge once CI is configured
+- [x] Add `README.md` build status badge once CI is configured
+
+**Completed 2026-02-18.**
 
 ### Installers / Bundles
 

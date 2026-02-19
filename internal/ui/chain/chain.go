@@ -18,6 +18,22 @@ import (
 	"cert_viewer/internal/ui/summary"
 )
 
+// buildCertTab constructs a tab item displaying certificate details.
+func buildCertTab(win fyne.Window, title string, cert *x509.Certificate, p prefs.Preferences) *container.TabItem {
+	grid := container.New(ui.NewTightTwoColLayout())
+	tmp := container.New(ui.NewTightTwoColLayout())
+	summary.Render(win, grid, tmp, cert, p)
+	if len(cert.SubjectKeyId) > 0 {
+		grid.Add(ui.BoldLabel("Subject Key Identifier"))
+		grid.Add(ui.CopyRow(win, certs.FormatHex(cert.SubjectKeyId, string(p.UI.HexSep))))
+	}
+	if len(cert.AuthorityKeyId) > 0 {
+		grid.Add(ui.BoldLabel("Authority Key Identifier"))
+		grid.Add(ui.CopyRow(win, certs.FormatHex(cert.AuthorityKeyId, string(p.UI.HexSep))))
+	}
+	return container.NewTabItem(title, container.NewVScroll(grid))
+}
+
 // Build constructs a certificate chain up to 5 levels using AIA and renders tabs
 // into chainTabs. It returns immediately after showing a progress indicator and
 // performs all network I/O on a background goroutine. Cancelling ctx stops the
@@ -29,25 +45,9 @@ func Build(ctx context.Context, win fyne.Window, chainTabs *container.AppTabs, l
 	chainTabs.Refresh()
 
 	go func() {
-		// buildCertTab constructs a tab item for a certificate.
-		buildCertTab := func(title string, cert *x509.Certificate) *container.TabItem {
-			grid := container.New(ui.NewTightTwoColLayout())
-			tmp := container.New(ui.NewTightTwoColLayout())
-			summary.Render(win, grid, tmp, cert, p)
-			if len(cert.SubjectKeyId) > 0 {
-				grid.Add(ui.BoldLabel("Subject Key Identifier"))
-				grid.Add(ui.CopyRow(win, certs.FormatHex(cert.SubjectKeyId, string(p.UI.HexSep))))
-			}
-			if len(cert.AuthorityKeyId) > 0 {
-				grid.Add(ui.BoldLabel("Authority Key Identifier"))
-				grid.Add(ui.CopyRow(win, certs.FormatHex(cert.AuthorityKeyId, string(p.UI.HexSep))))
-			}
-			return container.NewTabItem(title, container.NewVScroll(grid))
-		}
-
 		// Clear the spinner and add the leaf tab.
 		chainTabs.Items = nil
-		chainTabs.Append(buildCertTab("Leaf", leaf))
+		chainTabs.Append(buildCertTab(win, "Leaf", leaf, p))
 		chainTabs.Refresh()
 
 		// Disk I/O off the UI goroutine.
@@ -88,7 +88,7 @@ func Build(ctx context.Context, win fyne.Window, chainTabs *container.AppTabs, l
 			}
 
 			// Append issuer tab.
-			chainTabs.Append(buildCertTab(fmt.Sprintf("Issuer %d", depth), issuerCert))
+			chainTabs.Append(buildCertTab(win, fmt.Sprintf("Issuer %d", depth), issuerCert, p))
 			chainTabs.Refresh()
 
 			// Check local roots first, then CCADB.
@@ -109,6 +109,47 @@ func Build(ctx context.Context, win fyne.Window, chainTabs *container.AppTabs, l
 			current = issuerCert
 		}
 	}()
+}
+
+// BuildFromCerts renders a pre-built certificate chain directly into chainTabs
+// without any AIA fetching. certs[0] is displayed as the leaf; remaining
+// entries are displayed as issuers. The final cert is checked against the local
+// trust store and CCADB for a root match label.
+func BuildFromCerts(win fyne.Window, chainTabs *container.AppTabs, certList []*x509.Certificate, p prefs.Preferences) {
+	chainTabs.Items = nil
+	if len(certList) == 0 {
+		chainTabs.Append(container.NewTabItem("No certificates", widget.NewLabel("The PKCS#12 bundle contained no certificates.")))
+		chainTabs.Refresh()
+		return
+	}
+
+	chainTabs.Append(buildCertTab(win, "Leaf", certList[0], p))
+
+	issuerNum := 1
+	for i := 1; i < len(certList); i++ {
+		chainTabs.Append(buildCertTab(win, fmt.Sprintf("Issuer %d", issuerNum), certList[i], p))
+		issuerNum++
+	}
+
+	// Check the last cert against local trust store and CCADB.
+	last := certList[len(certList)-1]
+	if len(last.SubjectKeyId) > 0 {
+		key := certs.NormalizeHexBytesNoSepUpper(last.SubjectKeyId)
+		localSet, _ := resources.LoadLocalRootsSKISet()
+		if _, ok := localSet[key]; ok {
+			chainTabs.Append(container.NewTabItem("Root (from Local Store)", widget.NewLabel("Found Subject Key Identifier in local system trust bundle")))
+			chainTabs.Refresh()
+			return
+		}
+		ccadbSet, _ := resources.LoadCCADBSKISet(p)
+		if _, ok := ccadbSet[key]; ok {
+			chainTabs.Append(container.NewTabItem("Root (from CCADB)", widget.NewLabel("Found Subject Key Identifier in CCADB CSV")))
+			chainTabs.Refresh()
+			return
+		}
+	}
+
+	chainTabs.Refresh()
 }
 
 func fetchRemoteCert(ctx context.Context, url string) (*x509.Certificate, error) {

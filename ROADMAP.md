@@ -75,9 +75,11 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### Validity Color-Coding
 
-- [ ] Color the "Not After" / "Valid To" field red if the certificate is expired
-- [ ] Color it yellow/amber if expiration is within a configurable threshold (default: 30 days)
-- [ ] Apply the same coloring to chain sub-tabs
+- [x] Color the "Not After" / "Valid To" field red if the certificate is expired
+- [x] Color it yellow/amber if expiration is within a configurable threshold (default: 30 days)
+- [x] Apply the same coloring to chain sub-tabs
+
+**Completed 2026-02-19.**
 
 ### Recent Files
 

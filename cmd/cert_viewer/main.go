@@ -40,6 +40,7 @@ func main() {
 	var currentCert *x509.Certificate
 	var currentCSR *x509.CertificateRequest // non-nil when a CSR is open
 	var cancelChain context.CancelFunc
+	var cancelOCSP context.CancelFunc
 	var pkcs12Chain []*x509.Certificate // non-nil when a PKCS#12 bundle is open
 
 	// Summary tab contents: tight two-column layout (name | value)
@@ -72,7 +73,45 @@ func main() {
 		if cancelChain != nil {
 			cancelChain()
 		}
+		if cancelOCSP != nil {
+			cancelOCSP()
+			cancelOCSP = nil
+		}
 		summary.Render(window, summaryGrid, detailsContainer, currentCert, userPreferences)
+		// Append OCSP Status row if the cert has an OCSP URL.
+		if len(currentCert.OCSPServer) > 0 {
+			ocspStatus := widget.NewLabel("")
+			checkBtn := widget.NewButton("Check OCSP", nil)
+			var ocspCtx context.Context
+			ocspCtx, cancelOCSP = context.WithCancel(ctx)
+			// Capture per-cert values for the button closure.
+			buttonCtx := ocspCtx
+			cert := currentCert
+			var issuer *x509.Certificate
+			if len(pkcs12Chain) > 1 {
+				issuer = pkcs12Chain[1]
+			}
+			checkBtn.OnTapped = func() {
+				checkBtn.Disable()
+				ocspStatus.SetText("Checking...")
+				go func() {
+					resp, err := certs.CheckOCSP(buttonCtx, cert, issuer)
+					if buttonCtx.Err() != nil {
+						return // cert was replaced; discard result
+					}
+					if err != nil {
+						ocspStatus.SetText("Error: " + err.Error())
+					} else {
+						ocspStatus.SetText(certs.FormatOCSPStatus(resp))
+					}
+					ocspStatus.Refresh()
+					checkBtn.Enable()
+				}()
+			}
+			summaryGrid.Add(ui.BoldLabel("OCSP Status"))
+			summaryGrid.Add(container.NewHBox(ocspStatus, checkBtn))
+			summaryGrid.Refresh()
+		}
 		if pkcs12Chain != nil {
 			chain.BuildFromCerts(window, chainTabs, pkcs12Chain, userPreferences)
 		} else {
@@ -87,6 +126,10 @@ func main() {
 		if cancelChain != nil {
 			cancelChain()
 			cancelChain = nil
+		}
+		if cancelOCSP != nil {
+			cancelOCSP()
+			cancelOCSP = nil
 		}
 		summary.RenderCSR(window, summaryGrid, detailsContainer, currentCSR, userPreferences)
 		// Chain is not applicable for CSRs.

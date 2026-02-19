@@ -2,14 +2,9 @@ package resources
 
 import (
 	"context"
-	"crypto/sha256"
-	"crypto/x509"
-	"math/big"
-	"encoding/hex"
 	"encoding/json"
-	"encoding/pem"
 	"errors"
-	"io"
+	"math/big"
 	"os"
 	"path/filepath"
 	"time"
@@ -18,24 +13,23 @@ import (
 )
 
 const localRootsFileName = "local_roots.json"
-const defaultLinuxBundle = "/etc/ssl/certs/ca-certificates.crt"
 
 type LocalRootSummary struct {
 	Subject               string `json:"subject"`
 	SubjectKeyIdentifier  string `json:"subjectKeyIdentifier"`
-    SerialHex             string `json:"serialHex"`
+	SerialHex             string `json:"serialHex"`
 	NotBefore             string `json:"notBefore"`
 	NotAfter              string `json:"notAfter"`
 	SHA256FingerprintHex  string `json:"sha256"`
 }
 
 type localRootsFile struct {
-	GeneratedAt string              `json:"generatedAt"`
-	SourcePath  string              `json:"sourcePath"`
-	Roots       []LocalRootSummary  `json:"roots"`
+	GeneratedAt string             `json:"generatedAt"`
+	SourcePath  string             `json:"sourcePath"`
+	Roots       []LocalRootSummary `json:"roots"`
 }
 
-// LocalRootsPath returns the cache path to local_roots.json
+// LocalRootsPath returns the cache path to local_roots.json.
 func LocalRootsPath() (string, error) {
 	cache, err := prefs.CacheDir()
 	if err != nil {
@@ -44,68 +38,30 @@ func LocalRootsPath() (string, error) {
 	return filepath.Join(cache, localRootsFileName), nil
 }
 
-// EnsureLocalRootsJSON generates the local_roots.json if it does not exist.
+// EnsureLocalRootsJSON generates local_roots.json if it does not exist or needs
+// regeneration. Platform-specific certificate collection is handled by collectRoots(),
+// defined in localroots_linux.go / localroots_windows.go / localroots_unsupported.go.
 func EnsureLocalRootsJSON(ctx context.Context) error {
 	path, err := LocalRootsPath()
 	if err != nil {
 		return err
 	}
-    if _, err := os.Stat(path); err == nil {
-        // If exists, ensure it has SerialHex; if missing, regenerate
-        if needsRegen(path) {
-            // proceed to rebuild below
-        } else {
-            return nil
-        }
-    } else if !errors.Is(err, os.ErrNotExist) {
-        return err
-    }
-	// Try default Linux bundle
-	bundle := defaultLinuxBundle
-	f, err := os.Open(bundle)
-	if err != nil {
-		// If bundle not present, create empty file to avoid repeated attempts
-		if errors.Is(err, os.ErrNotExist) {
-			return writeLocalRoots(path, localRootsFile{GeneratedAt: time.Now().Format(time.RFC3339), SourcePath: bundle, Roots: nil})
+	if _, err := os.Stat(path); err == nil {
+		if !needsRegen(path) {
+			return nil
 		}
+	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	defer f.Close()
-	data, err := io.ReadAll(f)
+	roots, source, err := collectRoots(ctx)
 	if err != nil {
 		return err
 	}
-	roots := make([]LocalRootSummary, 0, 200)
-	for {
-		var block *pem.Block
-		block, data = pem.Decode(data)
-		if block == nil {
-			break
-		}
-		if block.Type != "CERTIFICATE" || len(block.Bytes) == 0 {
-			continue
-		}
-		cert, err := x509.ParseCertificate(block.Bytes)
-		if err != nil {
-			continue
-		}
-		sha := sha256.Sum256(cert.Raw)
-        summary := LocalRootSummary{
-			Subject:              cert.Subject.String(),
-			SubjectKeyIdentifier: hex.EncodeToString(cert.SubjectKeyId),
-            SerialHex:            upperNoSep(cert.SerialNumber),
-			NotBefore:            cert.NotBefore.Format("2006-01-02 15:04:05 MST"),
-			NotAfter:             cert.NotAfter.Format("2006-01-02 15:04:05 MST"),
-			SHA256FingerprintHex: hex.EncodeToString(sha[:]),
-		}
-		roots = append(roots, summary)
-	}
-	file := localRootsFile{
+	return writeLocalRoots(path, localRootsFile{
 		GeneratedAt: time.Now().Format(time.RFC3339),
-		SourcePath:  bundle,
-		Roots:      roots,
-	}
-	return writeLocalRoots(path, file)
+		SourcePath:  source,
+		Roots:       roots,
+	})
 }
 
 func writeLocalRoots(path string, content localRootsFile) error {
@@ -117,31 +73,42 @@ func writeLocalRoots(path string, content localRootsFile) error {
 }
 
 func needsRegen(path string) bool {
-    b, err := os.ReadFile(path)
-    if err != nil { return true }
-    var f localRootsFile
-    if err := json.Unmarshal(b, &f); err != nil { return true }
-    if len(f.Roots) == 0 { return false }
-    // If first entry has empty SerialHex, assume legacy and regenerate
-    return f.Roots[0].SerialHex == ""
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return true
+	}
+	var f localRootsFile
+	if err := json.Unmarshal(b, &f); err != nil {
+		return true
+	}
+	if len(f.Roots) == 0 {
+		return false
+	}
+	// If first entry has empty SerialHex, assume legacy format and regenerate.
+	return f.Roots[0].SerialHex == ""
 }
 
 func upperNoSep(n *big.Int) string {
-    if n == nil { return "" }
-    s := n.Text(16)
-    // pad even length
-    if len(s)%2 == 1 { s = "0" + s }
-    // uppercase
-    out := make([]byte, len(s))
-    for i := 0; i < len(s); i++ {
-        c := s[i]
-        if c >= 'a' && c <= 'f' { c = c - ('a' - 'A') }
-        out[i] = c
-    }
-    return string(out)
+	if n == nil {
+		return ""
+	}
+	s := n.Text(16)
+	// Pad to even length.
+	if len(s)%2 == 1 {
+		s = "0" + s
+	}
+	out := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'a' && c <= 'f' {
+			c = c - ('a' - 'A')
+		}
+		out[i] = c
+	}
+	return string(out)
 }
 
-// LoadLocalRootsSKISet loads local_roots.json and returns a map of normalized SKI -> summary
+// LoadLocalRootsSKISet loads local_roots.json and returns a map of normalized SKI → summary.
 func LoadLocalRootsSKISet() (map[string]LocalRootSummary, error) {
 	path, err := LocalRootsPath()
 	if err != nil {
@@ -181,7 +148,7 @@ func normalizeHexString(s string) string {
 		case c >= 'A' && c <= 'F':
 			out = append(out, c)
 		default:
-			// skip
+			// skip separators and non-hex characters
 		}
 	}
 	return string(out)

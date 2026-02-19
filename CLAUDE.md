@@ -143,10 +143,10 @@ silently — reference this list and address them as part of related work.
 4. **`escapeMarkdown()` is dead code** — defined at the bottom of `main.go` but never
    called. Remove when refactoring that file.
 
-5. **Linux-only trust store** — `localroots.go` is hardcoded to
-   `/etc/ssl/certs/ca-certificates.crt`. On Windows and macOS the comparison feature
-   will silently produce an empty result. Platform-specific trust store support is in
-   the roadmap.
+5. **macOS trust store not yet supported** — `localroots_linux.go` reads
+   `/etc/ssl/certs/ca-certificates.crt`; `localroots_windows.go` reads the Windows
+   `ROOT` certificate store via `golang.org/x/sys/windows`. macOS (`localroots_unsupported.go`)
+   returns an empty result — platform support is tracked in ROADMAP.md Phase 2.
 
 6. **Synchronous chain building** — `buildAndRenderChain()` makes HTTP requests on the
    UI goroutine, which will freeze the UI during chain fetches. Async chain building

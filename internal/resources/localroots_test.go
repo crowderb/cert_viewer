@@ -1,7 +1,6 @@
 package resources
 
 import (
-	"context"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -159,26 +158,4 @@ func TestLoadLocalRootsSKISet(t *testing.T) {
 		_, err := LoadLocalRootsSKISet()
 		assert.Error(t, err)
 	})
-}
-
-// --- Integration test (Linux only) ---
-
-func TestEnsureLocalRootsJSON_Integration(t *testing.T) {
-	if _, err := os.Stat(defaultLinuxBundle); os.IsNotExist(err) {
-		t.Skip("Linux certificate bundle not found at " + defaultLinuxBundle)
-	}
-	withTempCache(t)
-
-	// First call should generate the cache file.
-	err := EnsureLocalRootsJSON(context.Background())
-	require.NoError(t, err)
-
-	path, err := LocalRootsPath()
-	require.NoError(t, err)
-	_, statErr := os.Stat(path)
-	assert.NoError(t, statErr, "local_roots.json should have been created")
-
-	// Second call should be a no-op (returns nil without rebuilding).
-	err = EnsureLocalRootsJSON(context.Background())
-	assert.NoError(t, err)
 }

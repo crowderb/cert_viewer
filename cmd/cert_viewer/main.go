@@ -38,6 +38,7 @@ func main() {
 
 	// UI state
 	var currentCert *x509.Certificate
+	var currentCSR *x509.CertificateRequest // non-nil when a CSR is open
 	var cancelChain context.CancelFunc
 	var pkcs12Chain []*x509.Certificate // non-nil when a PKCS#12 bundle is open
 
@@ -81,6 +82,19 @@ func main() {
 		}
 	}
 
+	// renderCSR re-renders all CSR-dependent views.
+	renderCSR := func() {
+		if cancelChain != nil {
+			cancelChain()
+			cancelChain = nil
+		}
+		summary.RenderCSR(window, summaryGrid, detailsContainer, currentCSR, userPreferences)
+		// Chain is not applicable for CSRs.
+		chainTabs.Items = nil
+		chainTabs.Append(container.NewTabItem("Not Applicable", widget.NewLabel("Certificate chain is not available for certificate signing requests.")))
+		chainTabs.Refresh()
+	}
+
 	// openPKCS12 parses a PKCS#12 bundle, prompting for a password if needed.
 	// It tries an empty password first (for unencrypted files), then shows a
 	// password dialog on ErrIncorrectPassword.
@@ -96,6 +110,7 @@ func main() {
 				dialog.ShowError(fmt.Errorf("PKCS#12 parse failed: %w", err), window)
 				return
 			}
+			currentCSR = nil
 			currentCert = leaf
 			pkcs12Chain = append([]*x509.Certificate{leaf}, caChain...)
 			renderCert()
@@ -135,12 +150,25 @@ func main() {
 				openPKCS12(data, rc.URI().Name())
 				return
 			}
+			if strings.HasSuffix(name, ".csr") || strings.HasSuffix(name, ".req") {
+				csr, parseErr := certs.ParseCSR(data)
+				if parseErr != nil {
+					dialog.ShowError(parseErr, window)
+					return
+				}
+				currentCSR = csr
+				currentCert = nil
+				pkcs12Chain = nil
+				renderCSR()
+				return
+			}
 
 			cert, parseErr := certs.ParseCertificate(data)
 			if parseErr != nil {
 				dialog.ShowError(parseErr, window)
 				return
 			}
+			currentCSR = nil
 			pkcs12Chain = nil
 			currentCert = cert
 			renderCert()
@@ -153,14 +181,16 @@ func main() {
 				}
 			}
 		}
-		fd.SetFilter(storage.NewExtensionFileFilter([]string{".cer", ".crt", ".pem", ".der", ".p12", ".pfx"}))
+		fd.SetFilter(storage.NewExtensionFileFilter([]string{".cer", ".crt", ".pem", ".der", ".p12", ".pfx", ".csr", ".req"}))
 		fd.Show()
 	}
 
 	preferencesDialog := func() {
 		dialogs.ShowPreferences(window, userPreferences, func(p prefs.Preferences) {
 			userPreferences = p
-			if currentCert != nil {
+			if currentCSR != nil {
+				renderCSR()
+			} else if currentCert != nil {
 				renderCert()
 			}
 		})
@@ -201,8 +231,9 @@ func main() {
 			lower := strings.ToLower(path)
 			// Filter by extension
 			isPKCS12 := strings.HasSuffix(lower, ".p12") || strings.HasSuffix(lower, ".pfx")
+			isCSR := strings.HasSuffix(lower, ".csr") || strings.HasSuffix(lower, ".req")
 			isCert := strings.HasSuffix(lower, ".cer") || strings.HasSuffix(lower, ".crt") || strings.HasSuffix(lower, ".pem") || strings.HasSuffix(lower, ".der")
-			if !isPKCS12 && !isCert {
+			if !isPKCS12 && !isCSR && !isCert {
 				continue
 			}
 			// Read and open first matching file
@@ -221,12 +252,25 @@ func main() {
 				openPKCS12(data, filepath.Base(path))
 				return
 			}
+			if isCSR {
+				csr, err := certs.ParseCSR(data)
+				if err != nil {
+					dialog.ShowError(err, window)
+					return
+				}
+				currentCSR = csr
+				currentCert = nil
+				pkcs12Chain = nil
+				renderCSR()
+				return
+			}
 
 			cert, err := certs.ParseCertificate(data)
 			if err != nil {
 				dialog.ShowError(err, window)
 				return
 			}
+			currentCSR = nil
 			pkcs12Chain = nil
 			currentCert = cert
 			renderCert()

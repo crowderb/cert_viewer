@@ -60,6 +60,32 @@ func ParsePKCS12(data []byte, password string) (leaf *x509.Certificate, caCerts 
 	return all[0], all[1:], nil
 }
 
+// ParseCSR tries to parse a Certificate Signing Request from PEM or DER bytes.
+// Accepts "CERTIFICATE REQUEST" (RFC 2986) and "NEW CERTIFICATE REQUEST" (OpenSSL
+// legacy) PEM block types. Falls back to raw DER if no PEM block is found.
+func ParseCSR(data []byte) (*x509.CertificateRequest, error) {
+	var derBytes []byte
+	rest := data
+	for {
+		var pemBlock *pem.Block
+		pemBlock, rest = pem.Decode(rest)
+		if pemBlock == nil {
+			break
+		}
+		if (pemBlock.Type == "CERTIFICATE REQUEST" || pemBlock.Type == "NEW CERTIFICATE REQUEST") && len(pemBlock.Bytes) > 0 {
+			derBytes = pemBlock.Bytes
+			break
+		}
+	}
+	if len(derBytes) == 0 {
+		derBytes = data
+	}
+	if len(bytes.TrimSpace(derBytes)) == 0 {
+		return nil, fmt.Errorf("no CSR data found")
+	}
+	return x509.ParseCertificateRequest(derBytes)
+}
+
 // ParseCertificateOrPKCS7 parses a single certificate from PEM, DER, or a
 // PKCS#7 degenerate SignedData bundle (common in AIA CA Issuers responses).
 // It returns the first certificate found.

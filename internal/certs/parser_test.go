@@ -117,6 +117,86 @@ func mustMakePKCS7(t *testing.T, cert *x509.Certificate) []byte {
 	return p7bytes
 }
 
+// mustMakeCSR generates a self-signed ECDSA CSR for testing.
+// Returns both the raw DER bytes and the PEM-encoded form.
+func mustMakeCSR(t *testing.T) (derBytes []byte, pemBytes []byte) {
+	t.Helper()
+	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	template := &x509.CertificateRequest{
+		Subject: pkix.Name{CommonName: "test-csr"},
+	}
+	der, err := x509.CreateCertificateRequest(rand.Reader, template, key)
+	require.NoError(t, err)
+	var buf bytes.Buffer
+	err = pem.Encode(&buf, &pem.Block{Type: "CERTIFICATE REQUEST", Bytes: der})
+	require.NoError(t, err)
+	return der, buf.Bytes()
+}
+
+func TestParseCSR(t *testing.T) {
+	der, pemData := mustMakeCSR(t)
+
+	t.Run("valid PEM", func(t *testing.T) {
+		csr, err := ParseCSR(pemData)
+		require.NoError(t, err)
+		assert.Equal(t, "test-csr", csr.Subject.CommonName)
+	})
+
+	t.Run("valid DER", func(t *testing.T) {
+		csr, err := ParseCSR(der)
+		require.NoError(t, err)
+		assert.Equal(t, "test-csr", csr.Subject.CommonName)
+	})
+
+	t.Run("PEM skips non-CSR block and parses CSR", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := pem.Encode(&buf, &pem.Block{Type: "PRIVATE KEY", Bytes: []byte("not a key")})
+		require.NoError(t, err)
+		buf.Write(pemData)
+		csr, err := ParseCSR(buf.Bytes())
+		require.NoError(t, err)
+		assert.Equal(t, "test-csr", csr.Subject.CommonName)
+	})
+
+	t.Run("PEM with only wrong block type returns error", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := pem.Encode(&buf, &pem.Block{Type: "PRIVATE KEY", Bytes: []byte("not a csr")})
+		require.NoError(t, err)
+		_, err = ParseCSR(buf.Bytes())
+		assert.Error(t, err)
+	})
+
+	t.Run("empty input", func(t *testing.T) {
+		_, err := ParseCSR([]byte{})
+		assert.ErrorContains(t, err, "no CSR data found")
+	})
+
+	t.Run("nil input", func(t *testing.T) {
+		_, err := ParseCSR(nil)
+		assert.ErrorContains(t, err, "no CSR data found")
+	})
+
+	t.Run("whitespace only input", func(t *testing.T) {
+		_, err := ParseCSR([]byte("   \n\t  "))
+		assert.ErrorContains(t, err, "no CSR data found")
+	})
+
+	t.Run("malformed DER bytes", func(t *testing.T) {
+		_, err := ParseCSR([]byte{0x00, 0x01, 0x02, 0x03})
+		assert.Error(t, err)
+	})
+
+	t.Run("NEW CERTIFICATE REQUEST PEM type accepted", func(t *testing.T) {
+		var buf bytes.Buffer
+		err := pem.Encode(&buf, &pem.Block{Type: "NEW CERTIFICATE REQUEST", Bytes: der})
+		require.NoError(t, err)
+		csr, err := ParseCSR(buf.Bytes())
+		require.NoError(t, err)
+		assert.Equal(t, "test-csr", csr.Subject.CommonName)
+	})
+}
+
 // Pre-generated PKCS#12 test fixtures (OpenSSL, EC P-256, legacy PBE + SHA-1 MAC
 // for compatibility with golang.org/x/crypto/pkcs12 v0.47.0).
 // nopassPFX: CN=pkcs12-test, no password.

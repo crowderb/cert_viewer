@@ -83,9 +83,11 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### Recent Files
 
-- [ ] Persist the last N (default: 10) opened file paths in preferences
-- [ ] Add a "Recent Files" submenu under File menu
-- [ ] Remove entries from the list if the file no longer exists
+- [x] Persist the last N (default: 10) opened file paths in preferences
+- [x] Add a "Recent Files" submenu under File menu
+- [x] Remove entries from the list if the file no longer exists
+
+**Completed 2026-02-19.**
 
 ### Certificate Details Export
 

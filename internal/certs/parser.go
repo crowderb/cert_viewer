@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"go.mozilla.org/pkcs7"
+	"golang.org/x/crypto/pkcs12"
 )
 
 // ParseCertificate tries to parse a certificate from PEM or DER bytes.
@@ -32,6 +33,31 @@ func ParseCertificate(data []byte) (*x509.Certificate, error) {
 		return nil, fmt.Errorf("no certificate data found")
 	}
 	return x509.ParseCertificate(derBytes)
+}
+
+// ParsePKCS12 decodes a PKCS#12 / PFX bundle and returns the leaf certificate
+// and any CA certificates embedded in the bundle. The private key is discarded.
+// If the password is wrong, the error wraps pkcs12.ErrIncorrectPassword.
+func ParsePKCS12(data []byte, password string) (leaf *x509.Certificate, caCerts []*x509.Certificate, err error) {
+	blocks, err := pkcs12.ToPEM(data, password)
+	if err != nil {
+		return nil, nil, err
+	}
+	var all []*x509.Certificate
+	for _, block := range blocks {
+		if block.Type != "CERTIFICATE" {
+			continue
+		}
+		cert, parseErr := x509.ParseCertificate(block.Bytes)
+		if parseErr != nil {
+			continue
+		}
+		all = append(all, cert)
+	}
+	if len(all) == 0 {
+		return nil, nil, fmt.Errorf("pkcs12: no certificates found in bundle")
+	}
+	return all[0], all[1:], nil
 }
 
 // ParseCertificateOrPKCS7 parses a single certificate from PEM, DER, or a

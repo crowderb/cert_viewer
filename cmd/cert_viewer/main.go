@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"crypto/x509"
+	"errors"
+	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -13,6 +16,7 @@ import (
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
 	"fyne.io/fyne/v2/widget"
+	"golang.org/x/crypto/pkcs12"
 
 	"cert_viewer/internal/certs"
 	"cert_viewer/internal/prefs"
@@ -35,6 +39,7 @@ func main() {
 	// UI state
 	var currentCert *x509.Certificate
 	var cancelChain context.CancelFunc
+	var pkcs12Chain []*x509.Certificate // non-nil when a PKCS#12 bundle is open
 
 	// Summary tab contents: tight two-column layout (name | value)
 	summaryGrid := container.New(ui.NewTightTwoColLayout(),
@@ -67,9 +72,35 @@ func main() {
 			cancelChain()
 		}
 		summary.Render(window, summaryGrid, detailsContainer, currentCert, userPreferences)
-		var chainCtx context.Context
-		chainCtx, cancelChain = context.WithCancel(ctx)
-		chain.Build(chainCtx, window, chainTabs, currentCert, userPreferences)
+		if pkcs12Chain != nil {
+			chain.BuildFromCerts(window, chainTabs, pkcs12Chain, userPreferences)
+		} else {
+			var chainCtx context.Context
+			chainCtx, cancelChain = context.WithCancel(ctx)
+			chain.Build(chainCtx, window, chainTabs, currentCert, userPreferences)
+		}
+	}
+
+	// openPKCS12 parses a PKCS#12 bundle, prompting for a password if needed.
+	// It tries an empty password first (for unencrypted files), then shows a
+	// password dialog on ErrIncorrectPassword.
+	openPKCS12 := func(data []byte, name string) {
+		var tryOpen func(password string)
+		tryOpen = func(password string) {
+			leaf, caChain, err := certs.ParsePKCS12(data, password)
+			if err != nil {
+				if errors.Is(err, pkcs12.ErrIncorrectPassword) {
+					dialogs.ShowPasswordPrompt(window, name, tryOpen)
+					return
+				}
+				dialog.ShowError(fmt.Errorf("PKCS#12 parse failed: %w", err), window)
+				return
+			}
+			currentCert = leaf
+			pkcs12Chain = append([]*x509.Certificate{leaf}, caChain...)
+			renderCert()
+		}
+		tryOpen("") // try empty password first (handles unencrypted PFX silently)
 	}
 
 	// Menu actions
@@ -90,12 +121,6 @@ func main() {
 				return
 			}
 
-			cert, parseErr := certs.ParseCertificate(data)
-			if parseErr != nil {
-				dialog.ShowError(parseErr, window)
-				return
-			}
-			currentCert = cert
 			// Save last directory from the opened file's URI
 			if rc.URI() != nil {
 				if parent, perr := storage.Parent(rc.URI()); perr == nil && parent != nil {
@@ -103,6 +128,21 @@ func main() {
 					_ = prefs.Save(userPreferences)
 				}
 			}
+
+			name := strings.ToLower(rc.URI().Name())
+			if strings.HasSuffix(name, ".p12") || strings.HasSuffix(name, ".pfx") {
+				pkcs12Chain = nil
+				openPKCS12(data, rc.URI().Name())
+				return
+			}
+
+			cert, parseErr := certs.ParseCertificate(data)
+			if parseErr != nil {
+				dialog.ShowError(parseErr, window)
+				return
+			}
+			pkcs12Chain = nil
+			currentCert = cert
 			renderCert()
 		}, window)
 		// Set initial location from preferences if present
@@ -113,7 +153,7 @@ func main() {
 				}
 			}
 		}
-		fd.SetFilter(storage.NewExtensionFileFilter([]string{".cer", ".crt", ".pem", ".der"}))
+		fd.SetFilter(storage.NewExtensionFileFilter([]string{".cer", ".crt", ".pem", ".der", ".p12", ".pfx"}))
 		fd.Show()
 	}
 
@@ -158,9 +198,11 @@ func main() {
 				continue
 			}
 			path := u.Path()
-			// Filter by extension
 			lower := strings.ToLower(path)
-			if !(strings.HasSuffix(lower, ".cer") || strings.HasSuffix(lower, ".crt") || strings.HasSuffix(lower, ".pem") || strings.HasSuffix(lower, ".der")) {
+			// Filter by extension
+			isPKCS12 := strings.HasSuffix(lower, ".p12") || strings.HasSuffix(lower, ".pfx")
+			isCert := strings.HasSuffix(lower, ".cer") || strings.HasSuffix(lower, ".crt") || strings.HasSuffix(lower, ".pem") || strings.HasSuffix(lower, ".der")
+			if !isPKCS12 && !isCert {
 				continue
 			}
 			// Read and open first matching file
@@ -169,16 +211,24 @@ func main() {
 				dialog.ShowError(err, window)
 				return
 			}
+			if parent, perr := storage.Parent(storage.NewFileURI(path)); perr == nil && parent != nil {
+				userPreferences.UI.LastDir = parent.String()
+			}
+			_ = prefs.Save(userPreferences)
+
+			if isPKCS12 {
+				pkcs12Chain = nil
+				openPKCS12(data, filepath.Base(path))
+				return
+			}
+
 			cert, err := certs.ParseCertificate(data)
 			if err != nil {
 				dialog.ShowError(err, window)
 				return
 			}
+			pkcs12Chain = nil
 			currentCert = cert
-			if parent, perr := storage.Parent(storage.NewFileURI(path)); perr == nil && parent != nil {
-				userPreferences.UI.LastDir = parent.String()
-			}
-			_ = prefs.Save(userPreferences)
 			renderCert()
 			return
 		}

@@ -145,3 +145,23 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 	d.Resize(fyne.NewSize(540, 400))
 	d.Show()
 }
+
+// ShowPasswordPrompt displays a password entry dialog for opening an encrypted
+// PKCS#12 file. onSubmit is called with the entered password when the user
+// clicks Open; nothing is called if the user cancels.
+func ShowPasswordPrompt(win fyne.Window, filename string, onSubmit func(password string)) {
+	entry := widget.NewPasswordEntry()
+	entry.SetPlaceHolder("Leave blank if none")
+	content := container.NewVBox(
+		widget.NewLabel("Enter password for: "+filename),
+		entry,
+	)
+	d := dialog.NewCustomConfirm("Open PKCS#12", "Open", "Cancel", content, func(ok bool) {
+		if !ok {
+			return
+		}
+		onSubmit(entry.Text)
+	}, win)
+	d.Resize(fyne.NewSize(420, 180))
+	d.Show()
+}

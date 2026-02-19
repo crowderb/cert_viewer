@@ -9,6 +9,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/widget"
@@ -35,13 +36,18 @@ func Render(win fyne.Window, summaryGrid *fyne.Container, details *fyne.Containe
 	addSummaryRow("Issuer", cert.Issuer.String())
 	// Serial uses same separator preference as fingerprints
 	addSummaryRow("Serial Number", certs.FormatSerialWithSep(cert.SerialNumber, string(p.UI.HexSep)))
-	// Validity rows labeled based on preference
+	// Validity rows labeled based on preference; "Not After"/"Valid To" is colored
+	// based on expiry state.
+	expiryColor := ValidityColorName(cert.NotAfter, time.Now(), p.UI.ExpiryWarnDays)
+	notAfterStr := cert.NotAfter.Format("2006-01-02 15:04:05 MST")
 	if p.UI.NameStyle == prefs.Windows {
 		addSummaryRow("Valid From", cert.NotBefore.Format("2006-01-02 15:04:05 MST"))
-		addSummaryRow("Valid To", cert.NotAfter.Format("2006-01-02 15:04:05 MST"))
+		summaryGrid.Add(ui.BoldLabel("Valid To"))
+		summaryGrid.Add(ui.ColoredCopyRow(win, notAfterStr, expiryColor))
 	} else {
 		addSummaryRow("Not Before", cert.NotBefore.Format("2006-01-02 15:04:05 MST"))
-		addSummaryRow("Not After", cert.NotAfter.Format("2006-01-02 15:04:05 MST"))
+		summaryGrid.Add(ui.BoldLabel("Not After"))
+		summaryGrid.Add(ui.ColoredCopyRow(win, notAfterStr, expiryColor))
 	}
 
 	sha256Sum := sha256.Sum256(cert.Raw)
@@ -71,10 +77,22 @@ func Render(win fyne.Window, summaryGrid *fyne.Container, details *fyne.Containe
 	addPair("Issuer", cert.Issuer.String())
 	if p.UI.NameStyle == prefs.Windows {
 		addPair("Valid From", cert.NotBefore.Format("2006-01-02 15:04:05 MST"))
-		addPair("Valid To", cert.NotAfter.Format("2006-01-02 15:04:05 MST"))
+		details.Add(widget.NewLabel("Valid To"))
+		vTo := widget.NewRichText(&widget.TextSegment{
+			Text:  notAfterStr,
+			Style: widget.RichTextStyle{ColorName: expiryColor},
+		})
+		vTo.Wrapping = fyne.TextWrapWord
+		details.Add(vTo)
 	} else {
 		addPair("Not Before", cert.NotBefore.Format("2006-01-02 15:04:05 MST"))
-		addPair("Not After", cert.NotAfter.Format("2006-01-02 15:04:05 MST"))
+		details.Add(widget.NewLabel("Not After"))
+		vAfter := widget.NewRichText(&widget.TextSegment{
+			Text:  notAfterStr,
+			Style: widget.RichTextStyle{ColorName: expiryColor},
+		})
+		vAfter.Wrapping = fyne.TextWrapWord
+		details.Add(vAfter)
 	}
 	addPair("Subject", cert.Subject.String())
 	// Subject and Issuer attribute breakdown

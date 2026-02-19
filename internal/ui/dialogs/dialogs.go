@@ -93,12 +93,20 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 	daysEntry := widget.NewEntry()
 	daysEntry.SetText(strconv.Itoa(p.Resources.RefreshDays))
 
+	// Expiry Warning Days
+	warnDaysEntry := widget.NewEntry()
+	warnDaysEntry.SetText(strconv.Itoa(p.UI.ExpiryWarnDays))
+
 	content := container.NewVBox(
 		widget.NewLabel("Attribute name style:"),
 		nameRadio,
 		widget.NewSeparator(),
 		widget.NewLabel("Hex value separator:"),
 		hexRadio,
+		widget.NewSeparator(),
+		widget.NewLabel("Display:"),
+		widget.NewLabel("Expiry warning (days):"),
+		warnDaysEntry,
 		widget.NewSeparator(),
 		widget.NewLabel("Resources:"),
 		widget.NewLabel("CCADB URL:"),
@@ -133,6 +141,12 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 			p.Resources.CCADBURL = prefs.Default().Resources.CCADBURL
 		}
 		p.Resources.CachedFilename = prefs.CacheFilenameFromURL(p.Resources.CCADBURL)
+		// Expiry Warning Days — non-positive or non-numeric resets to 30
+		if n, err := strconv.Atoi(warnDaysEntry.Text); err == nil && n > 0 {
+			p.UI.ExpiryWarnDays = n
+		} else {
+			p.UI.ExpiryWarnDays = 30
+		}
 		// Refresh Days — non-positive or non-numeric resets to 30
 		if n, err := strconv.Atoi(daysEntry.Text); err == nil && n > 0 {
 			p.Resources.RefreshDays = n
@@ -142,7 +156,7 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 		_ = prefs.Save(p)
 		onApply(p)
 	}, win)
-	d.Resize(fyne.NewSize(540, 400))
+	d.Resize(fyne.NewSize(540, 460))
 	d.Show()
 }
 

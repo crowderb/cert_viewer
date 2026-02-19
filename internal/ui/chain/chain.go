@@ -1,6 +1,7 @@
 package chain
 
 import (
+	"context"
 	"crypto/x509"
 	"fmt"
 	"io"
@@ -8,7 +9,6 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
 
 	"cert_viewer/internal/certs"
@@ -19,81 +19,104 @@ import (
 )
 
 // Build constructs a certificate chain up to 5 levels using AIA and renders tabs
-// into chainTabs.
-func Build(win fyne.Window, chainTabs *container.AppTabs, leaf *x509.Certificate, p prefs.Preferences) {
-	// Reset tabs
+// into chainTabs. It returns immediately after showing a progress indicator and
+// performs all network I/O on a background goroutine. Cancelling ctx stops the
+// in-flight fetch and leaves whatever tabs were already populated.
+func Build(ctx context.Context, win fyne.Window, chainTabs *container.AppTabs, leaf *x509.Certificate, p prefs.Preferences) {
+	// Sync preamble on the calling (UI) goroutine: show progress indicator.
 	chainTabs.Items = nil
-	addCertTab := func(title string, cert *x509.Certificate) {
-		// Reuse summary renderer into a compact container
-		grid := container.New(ui.NewTightTwoColLayout())
-		// Use a throwaway details container to satisfy function signature
-		tmp := container.New(ui.NewTightTwoColLayout())
-		summary.Render(win, grid, tmp, cert, p)
-		// Add SKI / AKI rows for chain visibility
-		if len(cert.SubjectKeyId) > 0 {
-			grid.Add(ui.BoldLabel("Subject Key Identifier"))
-			grid.Add(ui.CopyRow(win, certs.FormatHex(cert.SubjectKeyId, string(p.UI.HexSep))))
-		}
-		if len(cert.AuthorityKeyId) > 0 {
-			grid.Add(ui.BoldLabel("Authority Key Identifier"))
-			grid.Add(ui.CopyRow(win, certs.FormatHex(cert.AuthorityKeyId, string(p.UI.HexSep))))
-		}
-		chainTabs.Append(container.NewTabItem(title, container.NewVScroll(grid)))
-	}
-	addCertTab("Leaf", leaf)
+	chainTabs.Append(container.NewTabItem("Building chain...", widget.NewProgressBarInfinite()))
+	chainTabs.Refresh()
 
-	// Load local roots and CCADB SKI sets if available
-	localSet, _ := resources.LoadLocalRootsSKISet()
-	ccadbSet, _ := resources.LoadCCADBSKISet(p)
-	current := leaf
-	for depth := 1; depth <= 5; depth++ {
-		// Self-signed if AKI equals SKI
-		if len(current.AuthorityKeyId) > 0 && len(current.SubjectKeyId) > 0 {
-			if certs.NormalizeHexBytesNoSepUpper(current.AuthorityKeyId) == certs.NormalizeHexBytesNoSepUpper(current.SubjectKeyId) {
-				chainTabs.Append(container.NewTabItem("Self-signed", widget.NewLabel("Authority Key Identifier equals Subject Key Identifier")))
-				chainTabs.Refresh()
-				return
+	go func() {
+		// buildCertTab constructs a tab item for a certificate.
+		buildCertTab := func(title string, cert *x509.Certificate) *container.TabItem {
+			grid := container.New(ui.NewTightTwoColLayout())
+			tmp := container.New(ui.NewTightTwoColLayout())
+			summary.Render(win, grid, tmp, cert, p)
+			if len(cert.SubjectKeyId) > 0 {
+				grid.Add(ui.BoldLabel("Subject Key Identifier"))
+				grid.Add(ui.CopyRow(win, certs.FormatHex(cert.SubjectKeyId, string(p.UI.HexSep))))
 			}
+			if len(cert.AuthorityKeyId) > 0 {
+				grid.Add(ui.BoldLabel("Authority Key Identifier"))
+				grid.Add(ui.CopyRow(win, certs.FormatHex(cert.AuthorityKeyId, string(p.UI.HexSep))))
+			}
+			return container.NewTabItem(title, container.NewVScroll(grid))
 		}
-		// AIA: CA Issuers URL
-		var aiaURL string
-		if len(current.IssuingCertificateURL) > 0 {
-			aiaURL = current.IssuingCertificateURL[0]
-		} else {
-			break
-		}
-		// Fetch issuer cert
-		issuerCert, err := fetchRemoteCert(aiaURL)
-		if err != nil {
-			dialog.ShowError(fmt.Errorf("chain fetch failed at depth %d: %w", depth, err), win)
-			return
-		}
-		// Render tab
-		title := fmt.Sprintf("Issuer %d", depth)
-		c := issuerCert
-		addCertTab(title, c)
+
+		// Clear the spinner and add the leaf tab.
+		chainTabs.Items = nil
+		chainTabs.Append(buildCertTab("Leaf", leaf))
 		chainTabs.Refresh()
-		// Check local roots first, then CCADB
-		if len(c.SubjectKeyId) > 0 {
-			key := certs.NormalizeHexBytesNoSepUpper(c.SubjectKeyId)
-			if _, ok := localSet[key]; ok {
-				chainTabs.Append(container.NewTabItem("Root (from Local Store)", widget.NewLabel("Found Subject Key Identifier in local system trust bundle")))
+
+		// Disk I/O off the UI goroutine.
+		localSet, _ := resources.LoadLocalRootsSKISet()
+		ccadbSet, _ := resources.LoadCCADBSKISet(p)
+
+		current := leaf
+		for depth := 1; depth <= 5; depth++ {
+			// Self-signed: AKI == SKI.
+			if len(current.AuthorityKeyId) > 0 && len(current.SubjectKeyId) > 0 {
+				if certs.NormalizeHexBytesNoSepUpper(current.AuthorityKeyId) == certs.NormalizeHexBytesNoSepUpper(current.SubjectKeyId) {
+					chainTabs.Append(container.NewTabItem("Self-signed", widget.NewLabel("Authority Key Identifier equals Subject Key Identifier")))
+					chainTabs.Refresh()
+					return
+				}
+			}
+
+			// AIA: CA Issuers URL.
+			if len(current.IssuingCertificateURL) == 0 {
+				break
+			}
+			aiaURL := current.IssuingCertificateURL[0]
+
+			// Fetch — blocks until complete or context cancelled.
+			issuerCert, err := fetchRemoteCert(ctx, aiaURL)
+			if ctx.Err() != nil {
+				// Cancelled by the user opening a new certificate — stop silently.
+				return
+			}
+			if err != nil {
+				errMsg := fmt.Sprintf("Fetch failed: %v", err)
+				chainTabs.Append(container.NewTabItem(
+					fmt.Sprintf("Error (depth %d)", depth),
+					widget.NewLabel(errMsg),
+				))
 				chainTabs.Refresh()
 				return
 			}
-			if _, ok := ccadbSet[key]; ok {
-				chainTabs.Append(container.NewTabItem("Root (from CCADB)", widget.NewLabel("Found Subject Key Identifier in CCADB CSV")))
-				chainTabs.Refresh()
-				return
+
+			// Append issuer tab.
+			chainTabs.Append(buildCertTab(fmt.Sprintf("Issuer %d", depth), issuerCert))
+			chainTabs.Refresh()
+
+			// Check local roots first, then CCADB.
+			if len(issuerCert.SubjectKeyId) > 0 {
+				key := certs.NormalizeHexBytesNoSepUpper(issuerCert.SubjectKeyId)
+				if _, ok := localSet[key]; ok {
+					chainTabs.Append(container.NewTabItem("Root (from Local Store)", widget.NewLabel("Found Subject Key Identifier in local system trust bundle")))
+					chainTabs.Refresh()
+					return
+				}
+				if _, ok := ccadbSet[key]; ok {
+					chainTabs.Append(container.NewTabItem("Root (from CCADB)", widget.NewLabel("Found Subject Key Identifier in CCADB CSV")))
+					chainTabs.Refresh()
+					return
+				}
 			}
+
+			current = issuerCert
 		}
-		// Continue
-		current = issuerCert
-	}
+	}()
 }
 
-func fetchRemoteCert(url string) (*x509.Certificate, error) {
-	resp, err := http.Get(url) //nolint:noctx
+func fetchRemoteCert(ctx context.Context, url string) (*x509.Certificate, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +128,6 @@ func fetchRemoteCert(url string) (*x509.Certificate, error) {
 	if err != nil {
 		return nil, err
 	}
-	// AIA CA Issuers often returns DER or PKCS7; try to extract first cert
 	if cert, err := tryParseSingleCert(data); err == nil && cert != nil {
 		return cert, nil
 	}

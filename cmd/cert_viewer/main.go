@@ -34,6 +34,7 @@ func main() {
 
 	// UI state
 	var currentCert *x509.Certificate
+	var cancelChain context.CancelFunc
 
 	// Summary tab contents: tight two-column layout (name | value)
 	summaryGrid := container.New(ui.NewTightTwoColLayout(),
@@ -56,10 +57,19 @@ func main() {
 		container.NewTabItem("Advanced", container.NewVScroll(advancedContent)),
 	)
 
+	// Background context — cancelled on application exit.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// renderCert re-renders all certificate-dependent views.
 	renderCert := func() {
+		if cancelChain != nil {
+			cancelChain()
+		}
 		summary.Render(window, summaryGrid, detailsContainer, currentCert, userPreferences)
-		chain.Build(window, chainTabs, currentCert, userPreferences)
+		var chainCtx context.Context
+		chainCtx, cancelChain = context.WithCancel(ctx)
+		chain.Build(chainCtx, window, chainTabs, currentCert, userPreferences)
 	}
 
 	// Menu actions
@@ -140,10 +150,6 @@ func main() {
 	)
 	mainMenu := fyne.NewMainMenu(fileMenu, editMenu, resourcesMenu)
 	window.SetMainMenu(mainMenu)
-
-	// Prepare background context
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// Enable drag-and-drop to open certificate files
 	window.SetOnDropped(func(pos fyne.Position, uris []fyne.URI) {

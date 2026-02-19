@@ -118,6 +118,23 @@ func main() {
 		tryOpen("") // try empty password first (handles unencrypted PFX silently)
 	}
 
+	// openURL dials an HTTPS server and loads its TLS certificate chain.
+	openURL := func() {
+		dialogs.ShowOpenURL(window, func(rawInput string, skipVerify bool) {
+			go func() {
+				certChain, err := certs.FetchTLSCerts(rawInput, skipVerify)
+				if err != nil {
+					dialog.ShowError(err, window)
+					return
+				}
+				currentCSR = nil
+				currentCert = certChain[0]
+				pkcs12Chain = certChain
+				renderCert()
+			}()
+		})
+	}
+
 	// Menu actions
 	openCert := func() {
 		fd := dialog.NewFileOpen(func(rc fyne.URIReadCloser, err error) {
@@ -198,6 +215,7 @@ func main() {
 
 	fileMenu := fyne.NewMenu("File",
 		fyne.NewMenuItem("Open...", openCert),
+		fyne.NewMenuItem("Open URL...", openURL),
 		fyne.NewMenuItemSeparator(),
 		fyne.NewMenuItem("Quit", func() { application.Quit() }),
 	)

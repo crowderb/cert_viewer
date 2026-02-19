@@ -146,6 +146,28 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 	d.Show()
 }
 
+// ShowOpenURL displays an input dialog for connecting to a TLS server by
+// hostname or HTTPS URL. onSubmit is called with the raw input and skipVerify
+// flag when the user clicks Connect; nothing is called on Cancel.
+func ShowOpenURL(win fyne.Window, onSubmit func(rawInput string, skipVerify bool)) {
+	hostEntry := widget.NewEntry()
+	hostEntry.SetPlaceHolder("e.g. example.com or https://example.com:8443")
+	skipCheck := widget.NewCheck("Skip certificate verification (allows expired/self-signed)", nil)
+	content := container.NewVBox(
+		widget.NewLabel("Enter hostname or HTTPS URL:"),
+		hostEntry,
+		skipCheck,
+	)
+	d := dialog.NewCustomConfirm("Open URL", "Connect", "Cancel", content, func(ok bool) {
+		if !ok {
+			return
+		}
+		onSubmit(hostEntry.Text, skipCheck.Checked)
+	}, win)
+	d.Resize(fyne.NewSize(520, 200))
+	d.Show()
+}
+
 // ShowPasswordPrompt displays a password entry dialog for opening an encrypted
 // PKCS#12 file. onSubmit is called with the entered password when the user
 // clicks Open; nothing is called if the user cancels.

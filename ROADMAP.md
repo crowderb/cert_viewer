@@ -65,11 +65,13 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### OCSP Status Checking
 
-- [ ] Add an "OCSP Status" row to the Summary tab for certificates that have an
+- [x] Add an "OCSP Status" row to the Summary tab for certificates that have an
   OCSP URL in their AIA extension
-- [ ] Query the OCSP responder using `golang.org/x/crypto/ocsp` when the cert is loaded
-  (or on demand via a button to avoid latency on every open)
-- [ ] Display: Good / Revoked (with revocation time and reason) / Unknown / Error
+- [x] Query the OCSP responder using `golang.org/x/crypto/ocsp` on demand via a
+  "Check OCSP" button to avoid latency on every open
+- [x] Display: Good / Revoked (with revocation time and reason) / Unknown / Error
+
+**Completed 2026-02-19.**
 
 ### Validity Color-Coding
 

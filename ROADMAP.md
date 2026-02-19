@@ -55,11 +55,13 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### URL-Based Certificate Loading
 
-- [ ] Add a "Open URL" option in the File menu
-- [ ] Accept an HTTPS URL, connect via `crypto/tls`, and retrieve the server's
+- [x] Add a "Open URL" option in the File menu
+- [x] Accept an HTTPS URL, connect via `crypto/tls`, and retrieve the server's
   leaf certificate (and any chain presented by the server)
-- [ ] Load the leaf cert into the viewer; populate the Chain tab from the TLS handshake
+- [x] Load the leaf cert into the viewer; populate the Chain tab from the TLS handshake
   chain directly (no AIA fetching needed if server provides the full chain)
+
+**Completed 2026-02-19.**
 
 ### OCSP Status Checking
 

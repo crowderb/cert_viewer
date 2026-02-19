@@ -31,12 +31,14 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### PKCS#12 / PFX File Support
 
-- [ ] Add `.pfx` / `.p12` to the file open dialog filter
-- [ ] Parse PKCS#12 bundles using `golang.org/x/crypto/pkcs12`
-- [ ] Display the end-entity certificate (ignore private key material entirely)
-- [ ] If the bundle contains a chain, display it in the Chain tab directly
+- [x] Add `.pfx` / `.p12` to the file open dialog filter
+- [x] Parse PKCS#12 bundles using `golang.org/x/crypto/pkcs12`
+- [x] Display the end-entity certificate (ignore private key material entirely)
+- [x] If the bundle contains a chain, display it in the Chain tab directly
   (no AIA fetching needed)
-- [ ] Prompt for password if the bundle is encrypted (most are)
+- [x] Prompt for password if the bundle is encrypted (most are)
+
+**Completed 2026-02-19.**
 
 ### Certificate Signing Request (CSR) Viewing
 

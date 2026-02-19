@@ -22,10 +22,12 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### Asynchronous Chain Building
 
-- [ ] Move `chain.Build()` HTTP fetches off the UI goroutine
-- [ ] Show a progress indicator (spinner or status label) while chain is being built
-- [ ] Allow cancellation if the user opens a different certificate mid-build
-- [ ] Display partial chain if any intermediate fetch fails (currently stops at first error)
+- [x] Move `chain.Build()` HTTP fetches off the UI goroutine
+- [x] Show a progress indicator (spinner or status label) while chain is being built
+- [x] Allow cancellation if the user opens a different certificate mid-build
+- [x] Display partial chain if any intermediate fetch fails (currently stops at first error)
+
+**Completed 2026-02-18.**
 
 ### PKCS#12 / PFX File Support
 

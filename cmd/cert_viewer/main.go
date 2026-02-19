@@ -42,6 +42,7 @@ func main() {
 	var cancelChain context.CancelFunc
 	var cancelOCSP context.CancelFunc
 	var pkcs12Chain []*x509.Certificate // non-nil when a PKCS#12 bundle is open
+	var rebuildMainMenu func()
 
 	// Summary tab contents: tight two-column layout (name | value)
 	summaryGrid := container.New(ui.NewTightTwoColLayout(),
@@ -178,6 +179,50 @@ func main() {
 		})
 	}
 
+	// openRecentFile opens a cert/CSR/PKCS#12 file directly by OS path.
+	openRecentFile := func(path string) {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			dialog.ShowError(fmt.Errorf("cannot open %s: %w", filepath.Base(path), err), window)
+			return
+		}
+		if parent, perr := storage.Parent(storage.NewFileURI(path)); perr == nil && parent != nil {
+			userPreferences.UI.LastDir = parent.String()
+		}
+		userPreferences = prefs.AddRecentFile(userPreferences, path)
+		_ = prefs.Save(userPreferences)
+		rebuildMainMenu()
+
+		name := filepath.Base(path)
+		lower := strings.ToLower(name)
+		if strings.HasSuffix(lower, ".p12") || strings.HasSuffix(lower, ".pfx") {
+			pkcs12Chain = nil
+			openPKCS12(data, name)
+			return
+		}
+		if strings.HasSuffix(lower, ".csr") || strings.HasSuffix(lower, ".req") {
+			csr, parseErr := certs.ParseCSR(data)
+			if parseErr != nil {
+				dialog.ShowError(parseErr, window)
+				return
+			}
+			currentCSR = csr
+			currentCert = nil
+			pkcs12Chain = nil
+			renderCSR()
+			return
+		}
+		cert, parseErr := certs.ParseCertificate(data)
+		if parseErr != nil {
+			dialog.ShowError(parseErr, window)
+			return
+		}
+		currentCSR = nil
+		pkcs12Chain = nil
+		currentCert = cert
+		renderCert()
+	}
+
 	// Menu actions
 	openCert := func() {
 		fd := dialog.NewFileOpen(func(rc fyne.URIReadCloser, err error) {
@@ -196,12 +241,14 @@ func main() {
 				return
 			}
 
-			// Save last directory from the opened file's URI
+			// Save last directory and recent files from the opened file's URI
 			if rc.URI() != nil {
 				if parent, perr := storage.Parent(rc.URI()); perr == nil && parent != nil {
 					userPreferences.UI.LastDir = parent.String()
-					_ = prefs.Save(userPreferences)
 				}
+				userPreferences = prefs.AddRecentFile(userPreferences, rc.URI().Path())
+				_ = prefs.Save(userPreferences)
+				rebuildMainMenu()
 			}
 
 			name := strings.ToLower(rc.URI().Name())
@@ -256,12 +303,6 @@ func main() {
 		})
 	}
 
-	fileMenu := fyne.NewMenu("File",
-		fyne.NewMenuItem("Open...", openCert),
-		fyne.NewMenuItem("Open URL...", openURL),
-		fyne.NewMenuItemSeparator(),
-		fyne.NewMenuItem("Quit", func() { application.Quit() }),
-	)
 	editMenu := fyne.NewMenu("Edit",
 		fyne.NewMenuItem("Preferences", preferencesDialog),
 	)
@@ -279,8 +320,49 @@ func main() {
 			tabs.SelectIndex(3) // Advanced tab
 		}),
 	)
-	mainMenu := fyne.NewMainMenu(fileMenu, editMenu, resourcesMenu)
-	window.SetMainMenu(mainMenu)
+	rebuildMainMenu = func() {
+		// Prune non-existent files and persist if the list shrank
+		var alive []string
+		for _, p := range userPreferences.UI.RecentFiles {
+			if _, err := os.Stat(p); err == nil {
+				alive = append(alive, p)
+			}
+		}
+		if len(alive) != len(userPreferences.UI.RecentFiles) {
+			userPreferences.UI.RecentFiles = alive
+			_ = prefs.Save(userPreferences)
+		}
+
+		recentItem := fyne.NewMenuItem("Open Recent", nil)
+		if len(alive) == 0 {
+			recentItem.Disabled = true
+		} else {
+			subItems := make([]*fyne.MenuItem, 0, len(alive)+2)
+			for _, p := range alive {
+				p := p // capture loop variable
+				subItems = append(subItems, fyne.NewMenuItem(filepath.Base(p), func() {
+					openRecentFile(p)
+				}))
+			}
+			subItems = append(subItems, fyne.NewMenuItemSeparator())
+			subItems = append(subItems, fyne.NewMenuItem("Clear Recent", func() {
+				userPreferences.UI.RecentFiles = nil
+				_ = prefs.Save(userPreferences)
+				rebuildMainMenu()
+			}))
+			recentItem.ChildMenu = fyne.NewMenu("", subItems...)
+		}
+
+		newFileMenu := fyne.NewMenu("File",
+			fyne.NewMenuItem("Open...", openCert),
+			fyne.NewMenuItem("Open URL...", openURL),
+			recentItem,
+			fyne.NewMenuItemSeparator(),
+			fyne.NewMenuItem("Quit", func() { application.Quit() }),
+		)
+		window.SetMainMenu(fyne.NewMainMenu(newFileMenu, editMenu, resourcesMenu))
+	}
+	rebuildMainMenu()
 
 	// Enable drag-and-drop to open certificate files
 	window.SetOnDropped(func(pos fyne.Position, uris []fyne.URI) {
@@ -306,7 +388,9 @@ func main() {
 			if parent, perr := storage.Parent(storage.NewFileURI(path)); perr == nil && parent != nil {
 				userPreferences.UI.LastDir = parent.String()
 			}
+			userPreferences = prefs.AddRecentFile(userPreferences, path)
 			_ = prefs.Save(userPreferences)
+			rebuildMainMenu()
 
 			if isPKCS12 {
 				pkcs12Chain = nil

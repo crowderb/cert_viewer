@@ -5,6 +5,7 @@ go 1.21
 require (
 	fyne.io/fyne/v2 v2.5.3
 	github.com/stretchr/testify v1.8.4
+	go.mozilla.org/pkcs7 v0.9.0
 )
 
 require (

@@ -85,11 +85,12 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### PKCS#7 Support in AIA Downloads
 
-- [ ] In `tryParseSingleCert()` (chain builder), detect PKCS#7/CMS `Content-Type`
-  response header or attempt PKCS#7 parse using `golang.org/x/crypto/pkcs12` or
-  `go.mozilla.org/pkcs7`
-- [ ] Extract the signer certificate (or all certificates) from the bundle
-- [ ] Fall back gracefully with a clear error if parsing fails
+- [x] In `tryParseSingleCert()` (chain builder), detect PKCS#7/CMS `Content-Type`
+  response header or attempt PKCS#7 parse using `go.mozilla.org/pkcs7`
+- [x] Extract the signer certificate (or all certificates) from the bundle
+- [x] Fall back gracefully with a clear error if parsing fails
+
+**Completed 2026-02-18.**
 
 ### Asynchronous Chain Building
 

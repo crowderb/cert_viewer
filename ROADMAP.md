@@ -42,10 +42,12 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### Certificate Signing Request (CSR) Viewing
 
-- [ ] Add `.csr` / `.req` to the file open dialog filter
-- [ ] Parse CSR using `crypto/x509.ParseCertificateRequest()`
-- [ ] Display requested Subject, SANs, public key, and requested extensions
-- [ ] Show a clear indication in the UI that this is a request, not an issued cert
+- [x] Add `.csr` / `.req` to the file open dialog filter
+- [x] Parse CSR using `crypto/x509.ParseCertificateRequest()`
+- [x] Display requested Subject, SANs, public key, and requested extensions
+- [x] Show a clear indication in the UI that this is a request, not an issued cert
+
+**Completed 2026-02-19.**
 
 ---
 

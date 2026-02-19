@@ -29,6 +29,7 @@ type UISettings struct {
     LastDir            string       `json:"lastDir"`
     ShowCCADBOnlyCerts bool         `json:"showCCADBOnlyCerts"`
     ExpiryWarnDays     int          `json:"expiryWarnDays"` // 0 on old files → validated to 30
+    RecentFiles        []string     `json:"recentFiles"`    // ordered newest-first, capped at MaxRecentFiles
 }
 
 type Resources struct {
@@ -56,6 +57,26 @@ func CacheFilenameFromURL(rawURL string) string {
 type Preferences struct {
     UI        UISettings `json:"UI Settings"`
     Resources Resources  `json:"Resources"`
+}
+
+// MaxRecentFiles is the maximum number of recent file paths retained.
+const MaxRecentFiles = 10
+
+// AddRecentFile returns p with path moved to the front of UI.RecentFiles,
+// deduplicated and capped at MaxRecentFiles.
+func AddRecentFile(p Preferences, path string) Preferences {
+    var filtered []string
+    for _, f := range p.UI.RecentFiles {
+        if f != path {
+            filtered = append(filtered, f)
+        }
+    }
+    recent := append([]string{path}, filtered...)
+    if len(recent) > MaxRecentFiles {
+        recent = recent[:MaxRecentFiles]
+    }
+    p.UI.RecentFiles = recent
+    return p
 }
 
 func Default() Preferences {

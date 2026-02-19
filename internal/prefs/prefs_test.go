@@ -1,6 +1,7 @@
 package prefs
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -215,4 +216,93 @@ func TestCacheDir_CreatesDirectory(t *testing.T) {
 	require.NoError(t, err)
 	_, statErr := os.Stat(dir)
 	assert.NoError(t, statErr, "CacheDir should create the directory")
+}
+
+func TestAddRecentFile(t *testing.T) {
+	make10 := func() []string {
+		out := make([]string, MaxRecentFiles)
+		for i := range out {
+			out[i] = filepath.Join("/certs", fmt.Sprintf("cert%d.pem", i))
+		}
+		return out
+	}
+
+	tests := []struct {
+		name     string
+		initial  []string
+		path     string
+		wantLen  int
+		wantHead string // expected first element
+		wantDup  bool   // path must appear exactly once
+	}{
+		{
+			name:     "add to empty list",
+			initial:  nil,
+			path:     "/a/cert.pem",
+			wantLen:  1,
+			wantHead: "/a/cert.pem",
+			wantDup:  true,
+		},
+		{
+			name:     "prepend to existing",
+			initial:  []string{"/a/cert.pem"},
+			path:     "/b/other.crt",
+			wantLen:  2,
+			wantHead: "/b/other.crt",
+			wantDup:  true,
+		},
+		{
+			name:     "dedup already first",
+			initial:  []string{"/a/cert.pem", "/b/other.crt"},
+			path:     "/a/cert.pem",
+			wantLen:  2,
+			wantHead: "/a/cert.pem",
+			wantDup:  true,
+		},
+		{
+			name:     "dedup promotes to front",
+			initial:  []string{"/a/cert.pem", "/b/other.crt"},
+			path:     "/b/other.crt",
+			wantLen:  2,
+			wantHead: "/b/other.crt",
+			wantDup:  true,
+		},
+		{
+			name:     "cap at MaxRecentFiles",
+			initial:  make10(),
+			path:     "/new/cert.pem",
+			wantLen:  MaxRecentFiles,
+			wantHead: "/new/cert.pem",
+			wantDup:  true,
+		},
+		{
+			name:     "add existing in full list",
+			initial:  make10(),
+			path:     filepath.Join("/certs", "cert4.pem"),
+			wantLen:  MaxRecentFiles,
+			wantHead: filepath.Join("/certs", "cert4.pem"),
+			wantDup:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			p := Default()
+			p.UI.RecentFiles = tc.initial
+			got := AddRecentFile(p, tc.path)
+
+			assert.Equal(t, tc.wantLen, len(got.UI.RecentFiles), "length")
+			assert.Equal(t, tc.wantHead, got.UI.RecentFiles[0], "first element")
+
+			if tc.wantDup {
+				count := 0
+				for _, f := range got.UI.RecentFiles {
+					if f == tc.path {
+						count++
+					}
+				}
+				assert.Equal(t, 1, count, "path must appear exactly once")
+			}
+		})
+	}
 }

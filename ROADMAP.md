@@ -91,9 +91,11 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### Certificate Details Export
 
-- [ ] Add an "Export Details" option (File menu or context menu) that writes a
+- [x] Add an "Export Details" option (File menu or context menu) that writes a
   human-readable `.txt` file of the current certificate's Summary + Details content
-- [ ] Include an option to copy all details to clipboard in one action
+- [x] Include an option to copy all details to clipboard in one action
+
+**Completed 2026-02-19.**
 
 ### Multiple Certificate Comparison
 

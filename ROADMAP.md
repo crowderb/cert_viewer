@@ -25,6 +25,9 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 - [ ] Allow opening two certificates side-by-side in a split view
 - [ ] Highlight fields that differ between the two certificates
 
+### Add Check CRL button
+- [ ] add button on summary page with label 'Check CRL'
+- [ ] When Check CRL button is pressed, fetch the CRL, and check the current certificate against it. If not on CRL list, indicate 'Good' with green text. If on crl list, indicate 'REVOKED' with red text
 ---
 
 ## Completed

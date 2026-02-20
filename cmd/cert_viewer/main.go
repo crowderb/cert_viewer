@@ -10,8 +10,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"image/color"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
@@ -155,6 +158,48 @@ func main() {
 			}
 			summaryGrid.Add(ui.BoldLabel("CRL"))
 			summaryGrid.Add(container.NewHBox(crlStatus, fetchBtn))
+			// Check CRL row — checks this certificate's serial against the CRL.
+			checkCRLText := canvas.NewText("", color.Black)
+			checkCRLBtn := widget.NewButton("Check CRL", nil)
+			checkCert := currentCert
+			checkCRLBtn.OnTapped = func() {
+				checkCRLBtn.Disable()
+				checkCRLText.Text = "Checking..."
+				checkCRLText.Color = color.Black
+				checkCRLText.Refresh()
+				go func() {
+					var rl *x509.RevocationList
+					var fetchErr error
+					for _, url := range urls {
+						if buttonCtx.Err() != nil {
+							return
+						}
+						rl, fetchErr = certs.FetchCRL(buttonCtx, url)
+						if fetchErr == nil {
+							break
+						}
+					}
+					if buttonCtx.Err() != nil {
+						return
+					}
+					if fetchErr != nil {
+						checkCRLText.Text = "Error: " + fetchErr.Error()
+						checkCRLText.Color = color.Black
+					} else if entry := certs.CheckCertInCRL(checkCert, rl); entry != nil {
+						checkCRLText.Text = fmt.Sprintf("REVOKED (%s) %s",
+							certs.FormatRevocationReason(entry.ReasonCode),
+							entry.RevocationTime.UTC().Format("2006-01-02"))
+						checkCRLText.Color = color.NRGBA{R: 200, G: 0, B: 0, A: 255}
+					} else {
+						checkCRLText.Text = "Good"
+						checkCRLText.Color = color.NRGBA{R: 0, G: 180, B: 0, A: 255}
+					}
+					checkCRLText.Refresh()
+					checkCRLBtn.Enable()
+				}()
+			}
+			summaryGrid.Add(ui.BoldLabel("Check CRL"))
+			summaryGrid.Add(container.NewHBox(checkCRLText, checkCRLBtn))
 			summaryGrid.Refresh()
 		}
 		if pkcs12Chain != nil {

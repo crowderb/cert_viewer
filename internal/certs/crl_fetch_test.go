@@ -1,9 +1,13 @@
 package certs
 
 import (
+	"crypto/x509"
+	"math/big"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFormatRevocationReason(t *testing.T) {
@@ -26,4 +30,27 @@ func TestFormatRevocationReason(t *testing.T) {
 	for _, tc := range cases {
 		assert.Equal(t, tc.want, FormatRevocationReason(tc.code))
 	}
+}
+
+func TestCheckCertInCRL(t *testing.T) {
+	serial1 := big.NewInt(1001)
+	serial2 := big.NewInt(1002)
+	entry := x509.RevocationListEntry{
+		SerialNumber:   serial1,
+		RevocationTime: time.Now(),
+		ReasonCode:     1, // KeyCompromise
+	}
+	rl := &x509.RevocationList{
+		RevokedCertificateEntries: []x509.RevocationListEntry{entry},
+	}
+
+	// cert with serial1 is revoked
+	cert1 := &x509.Certificate{SerialNumber: serial1}
+	got := CheckCertInCRL(cert1, rl)
+	require.NotNil(t, got)
+	assert.Equal(t, 0, got.SerialNumber.Cmp(serial1))
+
+	// cert with serial2 is not revoked
+	cert2 := &x509.Certificate{SerialNumber: serial2}
+	assert.Nil(t, CheckCertInCRL(cert2, rl))
 }

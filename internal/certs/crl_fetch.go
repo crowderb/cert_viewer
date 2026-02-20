@@ -30,6 +30,17 @@ func FetchCRL(ctx context.Context, url string) (*x509.RevocationList, error) {
 	return rl, nil
 }
 
+// CheckCertInCRL reports whether cert's serial number appears in the revocation
+// list. Returns the matching entry (non-nil) if revoked, or nil if not found.
+func CheckCertInCRL(cert *x509.Certificate, rl *x509.RevocationList) *x509.RevocationListEntry {
+	for i := range rl.RevokedCertificateEntries {
+		if rl.RevokedCertificateEntries[i].SerialNumber.Cmp(cert.SerialNumber) == 0 {
+			return &rl.RevokedCertificateEntries[i]
+		}
+	}
+	return nil
+}
+
 // FormatRevocationReason maps an RFC 5280 reason code to its name.
 func FormatRevocationReason(code int) string {
 	switch code {

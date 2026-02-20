@@ -18,96 +18,12 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ---
 
-## Phase 3 — Core Feature Gaps
-
-### Asynchronous Chain Building
-
-- [x] Move `chain.Build()` HTTP fetches off the UI goroutine
-- [x] Show a progress indicator (spinner or status label) while chain is being built
-- [x] Allow cancellation if the user opens a different certificate mid-build
-- [x] Display partial chain if any intermediate fetch fails (currently stops at first error)
-
-**Completed 2026-02-18.**
-
-### PKCS#12 / PFX File Support
-
-- [x] Add `.pfx` / `.p12` to the file open dialog filter
-- [x] Parse PKCS#12 bundles using `golang.org/x/crypto/pkcs12`
-- [x] Display the end-entity certificate (ignore private key material entirely)
-- [x] If the bundle contains a chain, display it in the Chain tab directly
-  (no AIA fetching needed)
-- [x] Prompt for password if the bundle is encrypted (most are)
-
-**Completed 2026-02-19.**
-
-### Certificate Signing Request (CSR) Viewing
-
-- [x] Add `.csr` / `.req` to the file open dialog filter
-- [x] Parse CSR using `crypto/x509.ParseCertificateRequest()`
-- [x] Display requested Subject, SANs, public key, and requested extensions
-- [x] Show a clear indication in the UI that this is a request, not an issued cert
-
-**Completed 2026-02-19.**
-
----
-
 ## Phase 4 — Advanced Features
-
-### URL-Based Certificate Loading
-
-- [x] Add a "Open URL" option in the File menu
-- [x] Accept an HTTPS URL, connect via `crypto/tls`, and retrieve the server's
-  leaf certificate (and any chain presented by the server)
-- [x] Load the leaf cert into the viewer; populate the Chain tab from the TLS handshake
-  chain directly (no AIA fetching needed if server provides the full chain)
-
-**Completed 2026-02-19.**
-
-### OCSP Status Checking
-
-- [x] Add an "OCSP Status" row to the Summary tab for certificates that have an
-  OCSP URL in their AIA extension
-- [x] Query the OCSP responder using `golang.org/x/crypto/ocsp` on demand via a
-  "Check OCSP" button to avoid latency on every open
-- [x] Display: Good / Revoked (with revocation time and reason) / Unknown / Error
-
-**Completed 2026-02-19.**
-
-### Validity Color-Coding
-
-- [x] Color the "Not After" / "Valid To" field red if the certificate is expired
-- [x] Color it yellow/amber if expiration is within a configurable threshold (default: 30 days)
-- [x] Apply the same coloring to chain sub-tabs
-
-**Completed 2026-02-19.**
-
-### Recent Files
-
-- [x] Persist the last N (default: 10) opened file paths in preferences
-- [x] Add a "Recent Files" submenu under File menu
-- [x] Remove entries from the list if the file no longer exists
-
-**Completed 2026-02-19.**
-
-### Certificate Details Export
-
-- [x] Add an "Export Details" option (File menu or context menu) that writes a
-  human-readable `.txt` file of the current certificate's Summary + Details content
-- [x] Include an option to copy all details to clipboard in one action
-
-**Completed 2026-02-19.**
 
 ### Multiple Certificate Comparison
 
 - [ ] Allow opening two certificates side-by-side in a split view
 - [ ] Highlight fields that differ between the two certificates
-
-### CRL Distribution Point Viewer
-
-- [ ] When a certificate contains CRL Distribution Points, add a button to fetch and
-  display the CRL (list of revoked serial numbers)
-- [ ] Show: issuer, this update, next update, entry count, and a searchable list of
-  revoked serials with revocation dates and reasons
 
 ---
 
@@ -119,6 +35,8 @@ _Summary of completed phases. Full details in [docs/roadmaps/](docs/roadmaps/)._
   project setup (CLAUDE.md, ROADMAP.md, TECHNOLOGY.md, README.md), unit test suite
   (certs 100%, prefs 82.6%, resources 83.3%), and full refactoring of `main.go` into
   `internal/ui/` sub-packages. Phase 2 platform support (Windows trust store, macOS
-  trust store, GitHub Actions CI/release pipeline). Phase 3 core features (preferences
-  CCADB/refresh UI, CCADB version auto-discovery, PKCS#7 AIA support). Phase 4 partial
-  (Advanced tab color-coding).
+  trust store, GitHub Actions CI/release pipeline). Phase 3 core features complete
+  (async chain building, PKCS#12/PFX, CSR viewing, preferences CCADB/refresh UI, CCADB
+  version auto-discovery, PKCS#7 AIA support). Phase 4 advanced features complete
+  (URL-based cert loading, OCSP status checking, validity color-coding, recent files,
+  certificate details export, CRL Distribution Point Viewer).

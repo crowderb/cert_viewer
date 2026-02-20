@@ -41,6 +41,7 @@ func main() {
 	var currentCSR *x509.CertificateRequest // non-nil when a CSR is open
 	var cancelChain context.CancelFunc
 	var cancelOCSP context.CancelFunc
+	var cancelCRL context.CancelFunc
 	var pkcs12Chain []*x509.Certificate // non-nil when a PKCS#12 bundle is open
 	var rebuildMainMenu func()
 
@@ -78,6 +79,10 @@ func main() {
 			cancelOCSP()
 			cancelOCSP = nil
 		}
+		if cancelCRL != nil {
+			cancelCRL()
+			cancelCRL = nil
+		}
 		summary.Render(window, summaryGrid, detailsContainer, currentCert, userPreferences)
 		// Append OCSP Status row if the cert has an OCSP URL.
 		if len(currentCert.OCSPServer) > 0 {
@@ -113,6 +118,45 @@ func main() {
 			summaryGrid.Add(container.NewHBox(ocspStatus, checkBtn))
 			summaryGrid.Refresh()
 		}
+		if len(currentCert.CRLDistributionPoints) > 0 {
+			crlStatus := widget.NewLabel("")
+			fetchBtn := widget.NewButton("Fetch CRL", nil)
+			var crlCtx context.Context
+			crlCtx, cancelCRL = context.WithCancel(ctx)
+			buttonCtx := crlCtx
+			urls := currentCert.CRLDistributionPoints
+			fetchBtn.OnTapped = func() {
+				fetchBtn.Disable()
+				crlStatus.SetText("Fetching...")
+				go func() {
+					var rl *x509.RevocationList
+					var fetchErr error
+					for _, url := range urls {
+						if buttonCtx.Err() != nil {
+							return
+						}
+						rl, fetchErr = certs.FetchCRL(buttonCtx, url)
+						if fetchErr == nil {
+							break
+						}
+					}
+					if buttonCtx.Err() != nil {
+						return
+					}
+					if fetchErr != nil {
+						crlStatus.SetText("Error: " + fetchErr.Error())
+					} else {
+						crlStatus.SetText(fmt.Sprintf("%d revoked", len(rl.RevokedCertificateEntries)))
+						dialogs.ShowCRL(window, rl, urls[0])
+					}
+					crlStatus.Refresh()
+					fetchBtn.Enable()
+				}()
+			}
+			summaryGrid.Add(ui.BoldLabel("CRL"))
+			summaryGrid.Add(container.NewHBox(crlStatus, fetchBtn))
+			summaryGrid.Refresh()
+		}
 		if pkcs12Chain != nil {
 			chain.BuildFromCerts(window, chainTabs, pkcs12Chain, userPreferences)
 		} else {
@@ -131,6 +175,10 @@ func main() {
 		if cancelOCSP != nil {
 			cancelOCSP()
 			cancelOCSP = nil
+		}
+		if cancelCRL != nil {
+			cancelCRL()
+			cancelCRL = nil
 		}
 		summary.RenderCSR(window, summaryGrid, detailsContainer, currentCSR, userPreferences)
 		// Chain is not applicable for CSRs.

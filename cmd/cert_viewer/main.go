@@ -353,10 +353,60 @@ func main() {
 			recentItem.ChildMenu = fyne.NewMenu("", subItems...)
 		}
 
+		// Export menu items — enabled only when a cert or CSR is open.
+		nothingOpen := currentCert == nil && currentCSR == nil
+
+		exportDetailsItem := fyne.NewMenuItem("Export Details...", func() {
+			var text string
+			if currentCert != nil {
+				text = summary.ExportText(currentCert, userPreferences)
+			} else if currentCSR != nil {
+				text = summary.ExportCSRText(currentCSR, userPreferences)
+			}
+			fd := dialog.NewFileSave(func(wc fyne.URIWriteCloser, err error) {
+				if err != nil {
+					dialog.ShowError(err, window)
+					return
+				}
+				if wc == nil {
+					return
+				}
+				defer wc.Close()
+				if _, writeErr := wc.Write([]byte(text)); writeErr != nil {
+					dialog.ShowError(writeErr, window)
+				}
+			}, window)
+			if userPreferences.UI.LastDir != "" {
+				if u, err := storage.ParseURI(userPreferences.UI.LastDir); err == nil {
+					if l, lerr := storage.ListerForURI(u); lerr == nil {
+						fd.SetLocation(l)
+					}
+				}
+			}
+			fd.SetFileName("certificate_details.txt")
+			fd.SetFilter(storage.NewExtensionFileFilter([]string{".txt"}))
+			fd.Show()
+		})
+		exportDetailsItem.Disabled = nothingOpen
+
+		copyAllItem := fyne.NewMenuItem("Copy All to Clipboard", func() {
+			var text string
+			if currentCert != nil {
+				text = summary.ExportText(currentCert, userPreferences)
+			} else if currentCSR != nil {
+				text = summary.ExportCSRText(currentCSR, userPreferences)
+			}
+			window.Clipboard().SetContent(text)
+		})
+		copyAllItem.Disabled = nothingOpen
+
 		newFileMenu := fyne.NewMenu("File",
 			fyne.NewMenuItem("Open...", openCert),
 			fyne.NewMenuItem("Open URL...", openURL),
 			recentItem,
+			fyne.NewMenuItemSeparator(),
+			exportDetailsItem,
+			copyAllItem,
 			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("Quit", func() { application.Quit() }),
 		)

@@ -176,8 +176,17 @@ Completed phases include:
 
 ---
 
+## Repository
+
+**https://github.com/crowderb/cert_viewer/**
+
+Source code, issue tracker, and release downloads are all on GitHub.
+
+---
+
 ## Contributing
 
 See [CLAUDE.md](CLAUDE.md) for architecture notes, coding conventions, and known
 technical debt. See [TECHNOLOGY.md](TECHNOLOGY.md) for the full technology reference
 including package responsibilities and data flow diagrams.
+

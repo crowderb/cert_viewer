@@ -129,9 +129,9 @@ The quick-start commands below get you running from source. For a complete walkt
 full test suite, and producing the final distributable package — see the per-platform
 build guides:
 
-- [BUILD_GUIDE_linux.md](BUILD_GUIDE_linux.md) — Debian/Ubuntu: apt dependencies, binary, AppImage
-- [BUILD_GUIDE_windows.md](BUILD_GUIDE_windows.md) — TDM-GCC/MSYS2, binary, NSIS installer
-- [BUILD_GUIDE_macos.md](BUILD_GUIDE_macos.md) — Xcode CLT, binary, `.app` bundle and `.dmg`
+- [BUILD_GUIDE_LINUX.md](BUILD_GUIDE_LINUX.md) — Debian/Ubuntu: apt dependencies, binary, AppImage
+- [BUILD_GUIDE_WINDOWS.md](BUILD_GUIDE_WINDOWS.md) — TDM-GCC/MSYS2, binary, NSIS installer
+- [BUILD_GUIDE_MACOS.md](BUILD_GUIDE_MACOS.md) — Xcode CLT, binary, `.app` bundle and `.dmg`
 
 ```bash
 # Install system dependencies (Linux/Debian-Ubuntu)

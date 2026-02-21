@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=cert_viewer
+GenericName=Certificate Viewer
+Comment=X.509 Digital Certificate Viewer
+Exec=cert_viewer
+Icon=cert_viewer
+Categories=Utility;System;
+Keywords=certificate;X.509;TLS;SSL;PKI;

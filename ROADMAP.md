@@ -16,6 +16,17 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 - [x] Windows: installer via NSIS or WiX (or `go-msi`)
 - [x] Linux: AppImage for distro-agnostic distribution (optional)
 
+### Build Guides
+
+One step-by-step Markdown guide per supported OS, covering: fetching the latest (or a
+specific tagged) version of the source, installing all system prerequisites, running the
+test suite, and producing the final distributable package (binary + installer/bundle).
+Target files: `BUILD_GUIDE_linux.md`, `BUILD_GUIDE_windows.md`, `BUILD_GUIDE_macos.md`.
+
+- [ ] `BUILD_GUIDE_linux.md` — Debian/Ubuntu: apt dependencies, `go test`, binary + AppImage
+- [ ] `BUILD_GUIDE_windows.md` — TDM-GCC/MSYS2, cross-compile from Linux or native Windows build, NSIS installer
+- [ ] `BUILD_GUIDE_macos.md` — Xcode CLT, `go test`, binary + `.app` bundle + `.dmg`
+
 ---
 
 ## Completed

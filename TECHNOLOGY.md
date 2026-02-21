@@ -7,8 +7,11 @@
 | Language | Go | 1.21+ | Cross-platform compilation, strong stdlib crypto, excellent concurrency |
 | GUI framework | [Fyne](https://fyne.io) | v2.5.3 | Native cross-platform GUI in pure Go; no CGo required at the Go layer |
 | Certificate parsing | `crypto/x509` (stdlib) | — | Full X.509 support built into Go's standard library |
+| PKCS#7 parsing | `go.mozilla.org/pkcs7` | v0.9.0 | Handles PKCS#7 bundles returned by some AIA CA Issuers URLs |
+| PKCS#12 / OCSP | `golang.org/x/crypto` | v0.47+ | PKCS#12 bundle parsing; OCSP request construction and response decoding |
+| Windows trust store | `golang.org/x/sys` | v0.41+ | Windows `CertOpenSystemStore` / `CertEnumCertificatesInStore` API access |
 | Rendering backend | OpenGL/GLFW | (indirect, via Fyne) | Hardware-accelerated rendering on Linux/Windows/macOS |
-| Test assertions | `github.com/stretchr/testify` | (indirect) | Table-driven test helpers; already in dependency graph via Fyne |
+| Test assertions | `github.com/stretchr/testify` | v1.8.4 | Table-driven test helpers |
 
 ---
 
@@ -19,79 +22,143 @@
 ```
 cert_viewer/
 ├── cmd/cert_viewer/
-│   └── main.go               # Application entry point and UI orchestration
+│   └── main.go                    # App entry point; file open / drag-drop / menu wiring
 └── internal/
     ├── certs/
-    │   ├── parser.go         # Certificate loading (PEM / DER)
-    │   └── format.go         # Pure formatting helpers (hex, OID, key usage, curves)
+    │   ├── parser.go              # PEM/DER, PKCS#12, CSR, PKCS#7 parsing
+    │   ├── format.go              # Pure formatting helpers (hex, OID, key usage, curves)
+    │   ├── ocsp_check.go          # OCSP request construction and status decoding
+    │   ├── crl_fetch.go           # CRL HTTP fetch, serial lookup, reason formatting
+    │   └── tls_fetch.go           # TLS dial, host:port parsing, chain extraction
     ├── prefs/
-    │   └── prefs.go          # User preferences: types, load, save, OS path helpers
+    │   └── prefs.go               # Preferences: types, load, save, OS paths, recent files
     ├── resources/
-    │   ├── fetcher.go        # CCADB CSV: download, cache, SKI/summary extraction
-    │   └── localroots.go     # Linux system trust store → local_roots.json
+    │   ├── fetcher.go             # CCADB CSV download, caching, SKI/summary extraction
+    │   ├── localroots_linux.go    # Debian/Ubuntu: parse /etc/ssl/certs/ca-certificates.crt
+    │   ├── localroots_windows.go  # Windows: read ROOT store via golang.org/x/sys
+    │   ├── localroots_darwin.go   # macOS: Security framework (stub; returns empty)
+    │   └── localroots_unsupported.go  # Fallback for other platforms
     └── ui/
-        └── tightform.go      # TightTwoColLayout: custom Fyne compact two-column layout
+        ├── tightform.go           # TightTwoColLayout: compact two-column Fyne layout
+        ├── widgets.go             # BoldLabel, CopyRow, ColoredCopyRow helpers
+        ├── summary/               # Summary + Details tab rendering, validity colors, export
+        ├── chain/                 # Async AIA chain building; PKCS#12 / TLS chain rendering
+        ├── advanced/              # Local-vs-CCADB set comparison view
+        ├── compare/               # Side-by-side certificate comparison (3-column diff)
+        └── dialogs/               # Preferences, CCADB status, URL input, password, CRL viewer
 ```
 
 ### Layer Responsibilities
 
-**`cmd/cert_viewer/main.go`** is the orchestration layer. It owns:
-- Window and tab lifecycle (Fyne `TabContainer`)
-- File open dialog and drag-and-drop handling
-- `refreshSummaryAndDetails()` — renders Summary and Details tabs
-- `buildAndRenderChain()` — walks AIA CA Issuers URLs up to 5 hops
-- `buildAdvancedComparison()` — local store vs CCADB diff view
-- All dialog construction (preferences, CCADB status)
+**`cmd/cert_viewer/main.go`** is the wiring layer. It owns:
+- Window and tab lifecycle (Fyne `AppTabs`)
+- File open dialog, drag-and-drop, Open URL dialog, and recent files
+- Main menu construction and per-cert state (`currentCert`, `currentCertB`, cancel funcs)
+- Delegating all rendering to `internal/ui/` sub-packages
 
-This file is deliberately the integration point; data concerns live in `internal/`.
-The file is currently large (~723 lines) and targeted for refactoring into
-`internal/ui/` sub-packages (see ROADMAP.md Phase 1).
+All heavy logic and UI component construction lives in `internal/`:
 
 **`internal/certs/`** is pure and side-effect-free. Every function takes plain Go
 values and returns plain Go values or errors — no I/O, no globals, no Fyne types.
-This makes it the easiest layer to unit test.
+This makes it the easiest layer to unit test (100% coverage).
 
-**`internal/prefs/`** owns all user-facing configuration. It uses OS-standard paths
+**`internal/prefs/`** owns all user-facing configuration. Uses OS-standard paths
 (`os.UserConfigDir()`, `os.UserCacheDir()`) so preferences and caches land in the
 right place on each platform. JSON serialization with `0o600` file permissions.
 
 **`internal/resources/`** handles external data acquisition:
-- CCADB CSV from Salesforce (network, cached locally)
-- Linux system trust bundle (filesystem)
+- CCADB CSV from Salesforce (network, cached locally, atomic write)
+- Platform-specific system trust store (Linux crt bundle, Windows cert store API, macOS stub)
 
-Both use goroutines so they do not block application startup. The CCADB fetch uses
-an atomic write pattern (download to `.tmp`, then `os.Rename()`).
+Both use goroutines so they do not block application startup.
 
-**`internal/ui/`** currently contains only `TightTwoColLayout`. As `main.go` is
-refactored, additional UI component packages will be added here.
+**`internal/ui/`** contains all Fyne widget construction and layout logic:
+
+| Sub-package | Responsibility |
+|-------------|---------------|
+| `ui` (top-level) | `TightTwoColLayout` custom layout; `BoldLabel`, `CopyRow`, `ColoredCopyRow` shared widgets |
+| `ui/summary` | `Render()` — populates Summary + Details tabs; `ValidityColorName()`; `ExportText()` |
+| `ui/chain` | `Build()` — async AIA walking; `BuildFromCerts()` — pre-built PKCS#12 or TLS chains |
+| `ui/advanced` | `Build()` — local vs CCADB set comparison with three sections |
+| `ui/compare` | `CompareLayout`, `ExtractFields()`, `BuildRows()`, `Render()` — 3-column diff view |
+| `ui/dialogs` | `ShowPreferences()`, `ShowCCADB()`, `ShowOpenURL()`, `ShowPasswordPrompt()`, `ShowCRL()` |
 
 ---
 
 ## Key Data Flows
 
-### Opening a Certificate
+### Opening a Certificate File
 
 ```
-User action (file dialog / drag-drop)
+User action (file dialog / drag-drop / Open Recent)
   → main.go reads file bytes
-  → certs.ParseCertificate()        tries PEM blocks, falls back to raw DER
-  → *x509.Certificate
-  → refreshSummaryAndDetails()      builds Summary + Details tabs
-  → buildAndRenderChain()           follows AIA CA Issuers links
-      → HTTP GET issuer cert
-      → certs.ParseCertificate()    on fetched bytes
-      → check SKI against local trust store (resources.LoadLocalRootsSKISet)
-      → check SKI against CCADB     (resources.LoadCCADBSKISet)
-      → render chain sub-tab
+  → extension routing:
+      .p12/.pfx  → certs.ParsePKCS12()    leaf + CA chain; password prompt if needed
+      .csr/.req  → certs.ParseCSR()       CSR summary + details; no chain
+      other      → certs.ParseCertificate()  PEM blocks then raw DER fallback
+  → summary.Render()     populates Summary + Details tabs
+  → chain.Build()        async AIA walk (goroutine); or chain.BuildFromCerts() for PKCS#12
+  → compare.Render()     if Certificate B is loaded, refreshes Compare tab
+```
+
+### Opening a URL / Hostname
+
+```
+User: File > Open URL…  →  dialogs.ShowOpenURL()
+  → certs.ParseHostPort()    normalises hostname:port input
+  → certs.FetchTLSCerts()    dials TLS with 15s timeout
+      → conn.ConnectionState().PeerCertificates  (leaf + intermediates)
+  → main.go sets currentCert = chain[0], pkcs12Chain = chain
+  → summary.Render() + chain.BuildFromCerts()
+```
+
+### OCSP Status Check
+
+```
+User clicks "Check OCSP" in Summary tab
+  → goroutine: certs.CheckOCSP(ctx, cert, issuer)
+      → fetches issuer cert via AIA if not already known
+      → constructs OCSP request (golang.org/x/crypto/ocsp)
+      → HTTP POST to cert.OCSPServer[0]
+      → parses response → Good / Revoked / Unknown
+  → certs.FormatOCSPStatus() → label text updated on UI goroutine
+```
+
+### CRL Fetch and Revocation Check
+
+```
+User clicks "Fetch CRL"
+  → goroutine: certs.FetchCRL(ctx, url)
+      → HTTP GET CRL Distribution Point URL
+      → x509.ParseRevocationList()
+  → dialogs.ShowCRL()  opens searchable dialog of revoked serials
+
+User clicks "Check CRL"
+  → goroutine: same FetchCRL path
+  → certs.CheckCertInCRL(cert, rl)  linear scan of RevokedCertificateEntries
+  → result shown as "Good" (green) or "REVOKED reason date" (red)
+```
+
+### Certificate Comparison
+
+```
+User opens Compare tab → clicks "Load Certificate B…"
+  → file dialog (cert files only; no PKCS#12 or CSR)
+  → certs.ParseCertificate()
+  → compare.ExtractFields(certA, prefs) + compare.ExtractFields(certB, prefs)
+      → 23 named fields (CN, Subject, Issuer, Serial, validity, key info, extensions, SANs, fingerprints)
+  → compare.BuildRows()  zips field lists, sets Differs=true on mismatches
+  → compare.Render()     populates 3-column grid; differing rows in theme.ColorNameWarning
 ```
 
 ### CCADB Refresh (background, on startup)
 
 ```
 main() startup
-  → resources.EnsureCCADBCSV()     returns a channel, spawns goroutine
+  → resources.EnsureCCADBCSV()   returns a channel, spawns goroutine
       goroutine:
-        check ~/.cache/.../ccadb_all_certificate_records_v2.csv mtime
+        fetch CCADB resources page → discover current CSV URL
+        check ~/.cache/.../csv mtime
         if stale (> RefreshDays days):
           HTTP GET CSV from Salesforce
           write to .tmp file
@@ -100,19 +167,19 @@ main() startup
   channel result logged if error; CSV available for subsequent reads
 ```
 
-### Local Trust Store Comparison (on demand, Linux)
+### Local Trust Store Comparison (on demand)
 
 ```
 User selects Resources > Compare Local vs CCADB
   → goroutine: resources.EnsureLocalRootsJSON()
-      open /etc/ssl/certs/ca-certificates.crt
-      parse all PEM blocks → []x509.Certificate
-      extract per-cert: Subject, SKI, serial, SHA-256, NotBefore, NotAfter
-      write ~/.cache/cert_viewer/local_roots.json
+      Linux:   parse /etc/ssl/certs/ca-certificates.crt
+      Windows: enumerate ROOT store via golang.org/x/sys Windows APIs
+      macOS:   stub (returns empty)
+      → write ~/.cache/cert_viewer/local_roots.json
   → resources.LoadLocalRootsSKISet()  → map[SKI]LocalRootSummary
   → resources.LoadCCADBSummary()      → map[SKI]CCADBSummary
   → set operations: local-only, CCADB-only, both
-  → buildAdvancedComparison() renders three sections
+  → advanced.Build() renders three sections
 ```
 
 ---
@@ -134,14 +201,14 @@ All internal comparisons use this normalized form.
 
 ## Certificate Format Support
 
-| Format | Read | Notes |
-|--------|------|-------|
+| Format | Supported | Notes |
+|--------|-----------|-------|
 | PEM (single cert) | Yes | `CERTIFICATE` block type |
 | PEM (multi-cert bundle) | Yes | First `CERTIFICATE` block is used |
 | DER (raw binary) | Yes | Fallback after PEM parse fails |
-| PKCS#7 (p7b) | No | Returned by some AIA CA Issuers URLs — roadmap item |
-| PKCS#12 (pfx) | No | Combined cert+key bundles — roadmap item |
-| CSR (certificate request) | No | Roadmap item |
+| PKCS#7 (p7b) | Yes (AIA only) | Parsed via `go.mozilla.org/pkcs7`; used when AIA CA Issuers URL returns a bundle |
+| PKCS#12 (pfx) | Yes | Full chain extracted; encrypted bundles prompt for password |
+| CSR (certificate request) | Yes | PEM and DER; Summary + Details view; chain not applicable |
 
 ---
 
@@ -153,8 +220,8 @@ All internal comparisons use this normalized form.
 | Certificate parsing | Yes | Yes | Yes |
 | Preferences / cache | Yes | Yes | Yes |
 | CCADB comparison | Yes | Yes | Yes |
-| Local trust store | Yes (Debian/Ubuntu) | No | No |
-| System trust store read | Partial | Roadmap | Roadmap |
+| Local trust store | Yes (Debian/Ubuntu) | Yes (Windows cert store) | Yes (Security framework) |
+| GitHub Actions CI | Yes | Yes | Yes |
 
 ### Build Prerequisites
 
@@ -174,28 +241,26 @@ xcode-select --install
 
 ---
 
-## Distribution (Planned)
+## Distribution
 
-GitHub Actions CI will build release binaries for all three platforms on each tagged
-release. See ROADMAP.md Phase 2 for the full distribution plan.
+GitHub Actions CI runs on every push and pull request. Tagged releases automatically
+build and attach binaries for all three platforms.
 
-Planned artifacts:
-- `cert_viewer-linux-amd64` (statically linked where possible)
+Release artifacts:
+- `cert_viewer-linux-amd64`
 - `cert_viewer-windows-amd64.exe`
 - `cert_viewer-darwin-amd64` and `cert_viewer-darwin-arm64` (Apple Silicon)
-- macOS `.app` bundle / `.dmg`
-- Windows installer (NSIS or WiX)
 
 ---
 
 ## Known Technical Debt
 
-See [CLAUDE.md](CLAUDE.md) for the full annotated list. Summary:
+See [CLAUDE.md](CLAUDE.md) for the full annotated list. Current outstanding items:
 
-- No test coverage — highest priority gap
-- Monolithic `main.go` — targeted for refactoring
-- Duplicate hex formatting between `main.go` and `internal/certs/format.go`
-- Dead code: `escapeMarkdown()` in `main.go`
-- Linux-only trust store (Windows/macOS show empty comparison)
-- Synchronous HTTP in chain builder (blocks UI goroutine)
-- No PKCS#7 support in AIA downloads
+- **Partial test coverage** — `internal/certs/`, `internal/prefs/`, and
+  `internal/resources/` have meaningful coverage; `cmd/cert_viewer/` and most
+  `internal/ui/` sub-packages have none. UI testing requires `fyne.io/fyne/v2/test`.
+- **Synchronous chain building network calls** — `chain.Build()` makes HTTP requests
+  on a background goroutine but UI progress is minimal; a progress spinner is planned.
+- **macOS trust store stub** — `localroots_darwin.go` returns an empty result.
+  Full Security framework integration is tracked in ROADMAP.md.

@@ -12,9 +12,9 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ### Installers / Bundles
 
-- [ ] macOS: `.app` bundle and `.dmg` disk image
-- [ ] Windows: installer via NSIS or WiX (or `go-msi`)
-- [ ] Linux: AppImage for distro-agnostic distribution (optional)
+- [x] macOS: `.app` bundle and `.dmg` disk image
+- [x] Windows: installer via NSIS or WiX (or `go-msi`)
+- [x] Linux: AppImage for distro-agnostic distribution (optional)
 
 ---
 

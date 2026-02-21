@@ -1,0 +1,3 @@
+#!/bin/bash
+APPDIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec "${APPDIR}/usr/bin/cert_viewer" "$@"

@@ -31,6 +31,45 @@ jobs:
           name: cert_viewer-linux-amd64
           path: cert_viewer-linux-amd64
 
+      - name: Create AppImage
+        run: |
+          # Build AppDir structure
+          mkdir -p AppDir/usr/bin
+          cp cert_viewer-linux-amd64 AppDir/usr/bin/cert_viewer
+          chmod +x AppDir/usr/bin/cert_viewer
+          cp packaging/linux/cert_viewer.desktop AppDir/
+          cp packaging/linux/AppRun AppDir/
+          chmod +x AppDir/AppRun
+
+          # Generate a placeholder icon (required by appimagetool; replace with real icon later)
+          python3 -c "
+          import struct, zlib
+          def chunk(t, d):
+              c = t + d
+              return struct.pack('>I', len(d)) + c + struct.pack('>I', zlib.crc32(c) & 0xffffffff)
+          w, h = 256, 256
+          rows = b''.join(b'\x00' + bytes([30, 144, 255]) * w for _ in range(h))
+          open('AppDir/cert_viewer.png', 'wb').write(
+              b'\x89PNG\r\n\x1a\n'
+              + chunk(b'IHDR', struct.pack('>IIBBBBB', w, h, 8, 2, 0, 0, 0))
+              + chunk(b'IDAT', zlib.compress(rows))
+              + chunk(b'IEND', b''))
+          "
+
+          # Download appimagetool (release 13 — stable)
+          curl -L -o appimagetool \
+            https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
+          chmod +x appimagetool
+
+          # APPIMAGE_EXTRACT_AND_RUN=1 avoids the FUSE requirement on CI runners
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 ./appimagetool AppDir \
+            cert_viewer-linux-x86_64.AppImage
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cert_viewer-linux-x86_64.AppImage
+          path: cert_viewer-linux-x86_64.AppImage
+
   build-windows:
     runs-on: ubuntu-latest
     steps:
@@ -40,10 +79,10 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Install MinGW cross-compiler
+      - name: Install MinGW cross-compiler and NSIS
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-mingw-w64-x86-64
+          sudo apt-get install -y gcc-mingw-w64-x86-64 nsis
 
       - name: Build
         run: |
@@ -54,6 +93,16 @@ jobs:
         with:
           name: cert_viewer-windows-amd64.exe
           path: cert_viewer-windows-amd64.exe
+
+      - name: Create Windows installer
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          makensis /DVERSION="$VERSION" packaging/windows/installer.nsi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cert_viewer-windows-installer.exe
+          path: cert_viewer-windows-installer.exe
 
   build-darwin-amd64:
     runs-on: macos-13
@@ -74,6 +123,34 @@ jobs:
           name: cert_viewer-darwin-amd64
           path: cert_viewer-darwin-amd64
 
+      - name: Create macOS app bundle and DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCH=amd64
+
+          mkdir -p cert_viewer.app/Contents/MacOS
+          mkdir -p cert_viewer.app/Contents/Resources
+          cp cert_viewer-darwin-$ARCH cert_viewer.app/Contents/MacOS/cert_viewer
+          chmod +x cert_viewer.app/Contents/MacOS/cert_viewer
+          sed "s/VERSION_PLACEHOLDER/$VERSION/" packaging/macos/Info.plist \
+            > cert_viewer.app/Contents/Info.plist
+
+          # Stage DMG contents with an Applications symlink for drag-and-drop UX
+          mkdir dmg_staging
+          cp -R cert_viewer.app dmg_staging/
+          ln -s /Applications dmg_staging/Applications
+          hdiutil create \
+            -volname "cert_viewer" \
+            -srcfolder dmg_staging \
+            -ov -format UDZO \
+            cert_viewer-darwin-$ARCH.dmg
+          rm -rf dmg_staging
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cert_viewer-darwin-amd64.dmg
+          path: cert_viewer-darwin-amd64.dmg
+
   build-darwin-arm64:
     runs-on: macos-14
     steps:
@@ -93,6 +170,34 @@ jobs:
           name: cert_viewer-darwin-arm64
           path: cert_viewer-darwin-arm64
 
+      - name: Create macOS app bundle and DMG
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          ARCH=arm64
+
+          mkdir -p cert_viewer.app/Contents/MacOS
+          mkdir -p cert_viewer.app/Contents/Resources
+          cp cert_viewer-darwin-$ARCH cert_viewer.app/Contents/MacOS/cert_viewer
+          chmod +x cert_viewer.app/Contents/MacOS/cert_viewer
+          sed "s/VERSION_PLACEHOLDER/$VERSION/" packaging/macos/Info.plist \
+            > cert_viewer.app/Contents/Info.plist
+
+          # Stage DMG contents with an Applications symlink for drag-and-drop UX
+          mkdir dmg_staging
+          cp -R cert_viewer.app dmg_staging/
+          ln -s /Applications dmg_staging/Applications
+          hdiutil create \
+            -volname "cert_viewer" \
+            -srcfolder dmg_staging \
+            -ov -format UDZO \
+            cert_viewer-darwin-$ARCH.dmg
+          rm -rf dmg_staging
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cert_viewer-darwin-arm64.dmg
+          path: cert_viewer-darwin-arm64.dmg
+
   release:
     needs: [build-linux, build-windows, build-darwin-amd64, build-darwin-arm64]
     runs-on: ubuntu-latest
@@ -106,6 +211,10 @@ jobs:
           generate_release_notes: true
           files: |
             cert_viewer-linux-amd64/cert_viewer-linux-amd64
+            cert_viewer-linux-x86_64.AppImage/cert_viewer-linux-x86_64.AppImage
             cert_viewer-windows-amd64.exe/cert_viewer-windows-amd64.exe
+            cert_viewer-windows-installer.exe/cert_viewer-windows-installer.exe
             cert_viewer-darwin-amd64/cert_viewer-darwin-amd64
+            cert_viewer-darwin-amd64.dmg/cert_viewer-darwin-amd64.dmg
             cert_viewer-darwin-arm64/cert_viewer-darwin-arm64
+            cert_viewer-darwin-arm64.dmg/cert_viewer-darwin-arm64.dmg

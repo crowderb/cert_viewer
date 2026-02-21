@@ -23,9 +23,9 @@ specific tagged) version of the source, installing all system prerequisites, run
 test suite, and producing the final distributable package (binary + installer/bundle).
 Target files: `BUILD_GUIDE_LINUX.md`, `BUILD_GUIDE_WINDOWS.md`, `BUILD_GUIDE_MACOS.md`.
 
-- [ ] `BUILD_GUIDE_LINUX.md` — Debian/Ubuntu: apt dependencies, `go test`, binary + AppImage
-- [ ] `BUILD_GUIDE_WINDOWS.md` — TDM-GCC/MSYS2, cross-compile from Linux or native Windows build, NSIS installer
-- [ ] `BUILD_GUIDE_MACOS.md` — Xcode CLT, `go test`, binary + `.app` bundle + `.dmg`
+- [x] `BUILD_GUIDE_LINUX.md` — Debian/Ubuntu: apt dependencies, `go test`, binary + AppImage
+- [x] `BUILD_GUIDE_WINDOWS.md` — TDM-GCC/MSYS2, cross-compile from Linux or native Windows build, NSIS installer
+- [x] `BUILD_GUIDE_MACOS.md` — Xcode CLT, `go test`, binary + `.app` bundle + `.dmg`
 
 ---
 

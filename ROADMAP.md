@@ -18,21 +18,6 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ---
 
-## Phase 4 — Advanced Features
-
-### Multiple Certificate Comparison ✅ Completed 2026-02-21
-- [x] Allow opening two certificates side-by-side in a split view
-- [x] Highlight fields that differ between the two certificates
-
-### Documentation update ✅ Completed 2026-02-21
-- [x] Updated README.md to include all available features.
-- [x] Update TECHNOLOGY.md to reflect the latest enhancements
-
-### Add Check CRL button ✅ Completed 2026-02-19
-- [x] add button on summary page with label 'Check CRL'
-- [x] When Check CRL button is pressed, fetch the CRL, and check the current certificate against it. If not on CRL list, indicate 'Good' with green text. If on crl list, indicate 'REVOKED' with red text
----
-
 ## Completed
 
 _Summary of completed phases. Full details in [docs/roadmaps/](docs/roadmaps/)._
@@ -45,4 +30,5 @@ _Summary of completed phases. Full details in [docs/roadmaps/](docs/roadmaps/)._
   (async chain building, PKCS#12/PFX, CSR viewing, preferences CCADB/refresh UI, CCADB
   version auto-discovery, PKCS#7 AIA support). Phase 4 advanced features complete
   (URL-based cert loading, OCSP status checking, validity color-coding, recent files,
-  certificate details export, CRL Distribution Point Viewer).
+  certificate details export, CRL Distribution Point Viewer, Check CRL button, multiple
+  certificate comparison, documentation refresh).

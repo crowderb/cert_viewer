@@ -20,10 +20,14 @@ Completed phases are archived in [docs/roadmaps/](docs/roadmaps/).
 
 ## Phase 4 — Advanced Features
 
-### Multiple Certificate Comparison
+### Multiple Certificate Comparison ✅ Completed 2026-02-21
+- [x] Allow opening two certificates side-by-side in a split view
+- [x] Highlight fields that differ between the two certificates
 
-- [ ] Allow opening two certificates side-by-side in a split view
-- [ ] Highlight fields that differ between the two certificates
+### Documentation update
+
+- [ ] Updated README.md to include all availble features.
+- [ ] Update TECHNOLOGY.md to reflect the latest enhancements
 
 ### Add Check CRL button ✅ Completed 2026-02-19
 - [x] add button on summary page with label 'Check CRL'

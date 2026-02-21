@@ -27,6 +27,7 @@ import (
 	"cert_viewer/internal/ui"
 	"cert_viewer/internal/ui/advanced"
 	"cert_viewer/internal/ui/chain"
+	"cert_viewer/internal/ui/compare"
 	"cert_viewer/internal/ui/dialogs"
 	"cert_viewer/internal/ui/summary"
 )
@@ -48,6 +49,11 @@ func main() {
 	var pkcs12Chain []*x509.Certificate // non-nil when a PKCS#12 bundle is open
 	var rebuildMainMenu func()
 
+	// Compare tab state
+	var currentCertB *x509.Certificate
+	var currentFilenameA, currentFilenameB string
+	var renderCompareTab func()
+
 	// Summary tab contents: tight two-column layout (name | value)
 	summaryGrid := container.New(ui.NewTightTwoColLayout(),
 		ui.BoldLabel("Open a certificate to view its summary."),
@@ -61,12 +67,17 @@ func main() {
 	// Advanced tab content placeholder
 	advancedContent := container.NewVBox()
 
+	// Compare tab: 3-column comparison grid + content wrapper (header pinned, grid scrolls)
+	compareGrid := container.New(compare.NewCompareLayout())
+	compareContent := container.NewVBox()
+
 	// Tabs
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Summary", container.NewVScroll(summaryGrid)),
 		container.NewTabItem("Details", detailsScroll),
 		container.NewTabItem("Chain", chainTabs),
 		container.NewTabItem("Advanced", container.NewVScroll(advancedContent)),
+		container.NewTabItem("Compare", compareContent),
 	)
 
 	// Background context — cancelled on application exit.
@@ -209,6 +220,9 @@ func main() {
 			chainCtx, cancelChain = context.WithCancel(ctx)
 			chain.Build(chainCtx, window, chainTabs, currentCert, userPreferences)
 		}
+		if renderCompareTab != nil {
+			renderCompareTab()
+		}
 	}
 
 	// renderCSR re-renders all CSR-dependent views.
@@ -230,6 +244,9 @@ func main() {
 		chainTabs.Items = nil
 		chainTabs.Append(container.NewTabItem("Not Applicable", widget.NewLabel("Certificate chain is not available for certificate signing requests.")))
 		chainTabs.Refresh()
+		if renderCompareTab != nil {
+			renderCompareTab()
+		}
 	}
 
 	// openPKCS12 parses a PKCS#12 bundle, prompting for a password if needed.
@@ -249,6 +266,7 @@ func main() {
 			}
 			currentCSR = nil
 			currentCert = leaf
+			currentFilenameA = name
 			pkcs12Chain = append([]*x509.Certificate{leaf}, caChain...)
 			renderCert()
 		}
@@ -266,6 +284,7 @@ func main() {
 				}
 				currentCSR = nil
 				currentCert = certChain[0]
+				currentFilenameA = rawInput
 				pkcs12Chain = certChain
 				renderCert()
 			}()
@@ -301,6 +320,7 @@ func main() {
 			}
 			currentCSR = csr
 			currentCert = nil
+			currentFilenameA = name
 			pkcs12Chain = nil
 			renderCSR()
 			return
@@ -313,6 +333,7 @@ func main() {
 		currentCSR = nil
 		pkcs12Chain = nil
 		currentCert = cert
+		currentFilenameA = name
 		renderCert()
 	}
 
@@ -358,6 +379,7 @@ func main() {
 				}
 				currentCSR = csr
 				currentCert = nil
+				currentFilenameA = rc.URI().Name()
 				pkcs12Chain = nil
 				renderCSR()
 				return
@@ -371,6 +393,7 @@ func main() {
 			currentCSR = nil
 			pkcs12Chain = nil
 			currentCert = cert
+			currentFilenameA = rc.URI().Name()
 			renderCert()
 		}, window)
 		// Set initial location from preferences if present
@@ -507,6 +530,80 @@ func main() {
 	}
 	rebuildMainMenu()
 
+	// openCertB opens a file dialog to load the second certificate for comparison.
+	openCertB := func() {
+		fd := dialog.NewFileOpen(func(rc fyne.URIReadCloser, err error) {
+			if err != nil {
+				dialog.ShowError(err, window)
+				return
+			}
+			if rc == nil {
+				return
+			}
+			defer rc.Close()
+			data, readErr := io.ReadAll(rc)
+			if readErr != nil {
+				dialog.ShowError(readErr, window)
+				return
+			}
+			cert, parseErr := certs.ParseCertificate(data)
+			if parseErr != nil {
+				dialog.ShowError(parseErr, window)
+				return
+			}
+			currentCertB = cert
+			currentFilenameB = rc.URI().Name()
+			renderCompareTab()
+		}, window)
+		if userPreferences.UI.LastDir != "" {
+			if u, err := storage.ParseURI(userPreferences.UI.LastDir); err == nil && u != nil {
+				if l, lerr := storage.ListerForURI(u); lerr == nil && l != nil {
+					fd.SetLocation(l)
+				}
+			}
+		}
+		fd.SetFilter(storage.NewExtensionFileFilter([]string{".cer", ".crt", ".pem", ".der"}))
+		fd.Show()
+	}
+
+	// renderCompareTab rebuilds the Compare tab content based on current state.
+	renderCompareTab = func() {
+		compareContent.Objects = nil
+
+		if currentCert == nil && currentCSR == nil {
+			compareContent.Add(widget.NewLabel("Open a certificate to begin."))
+			compareContent.Refresh()
+			return
+		}
+		if currentCSR != nil {
+			compareContent.Add(widget.NewLabel("Certificate comparison is not available for CSRs."))
+			compareContent.Refresh()
+			return
+		}
+
+		// Certificate A is open: show the header row with filenames/buttons.
+		headerA := widget.NewLabel("A: " + currentFilenameA)
+		var rightWidget fyne.CanvasObject
+		if currentCertB != nil {
+			rightWidget = container.NewHBox(
+				widget.NewLabel("B: "+currentFilenameB),
+				widget.NewButton("Change...", openCertB),
+			)
+		} else {
+			rightWidget = widget.NewButton("Load Certificate B...", openCertB)
+		}
+		compareContent.Add(container.NewBorder(nil, nil, headerA, nil, rightWidget))
+		compareContent.Add(widget.NewSeparator())
+
+		if currentCertB != nil {
+			compare.Render(window, compareGrid, currentCert, currentCertB, userPreferences)
+			compareContent.Add(container.NewVScroll(compareGrid))
+		} else {
+			compareContent.Add(widget.NewLabel("Load a second certificate using the button above to compare."))
+		}
+		compareContent.Refresh()
+	}
+
 	// Enable drag-and-drop to open certificate files
 	window.SetOnDropped(func(pos fyne.Position, uris []fyne.URI) {
 		for _, u := range uris {
@@ -548,6 +645,7 @@ func main() {
 				}
 				currentCSR = csr
 				currentCert = nil
+				currentFilenameA = filepath.Base(path)
 				pkcs12Chain = nil
 				renderCSR()
 				return
@@ -561,6 +659,7 @@ func main() {
 			currentCSR = nil
 			pkcs12Chain = nil
 			currentCert = cert
+			currentFilenameA = filepath.Base(path)
 			renderCert()
 			return
 		}

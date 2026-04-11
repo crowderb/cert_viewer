@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"net/http"
+	"strings"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -230,6 +231,29 @@ func TestLoadCCADBSKISet(t *testing.T) {
 		require.NoError(t, err)
 		assert.Empty(t, set)
 	})
+}
+
+func TestLoadCCADBChainData(t *testing.T) {
+	p := prefs.Default()
+	cacheDir := withTempCache(t)
+	csv := "Certificate Name,Certificate Record Type,Subject Key Identifier,Authority Key Identifier," +
+		"Valid From (GMT),Valid To (GMT),SHA-256 Fingerprint," +
+		"Apple Status,Chrome Status,Microsoft Status,Mozilla Status\n" +
+		"Inter CA,Intermediate Certificate,AA:AA:AA,BB:BB:BB," +
+		"2020.01.01,2030.01.01,INTERHASH," +
+		"Included,Included,Included,Included\n" +
+		"My Root,Root Certificate,BB:BB:BB,," +
+		"2012.01.01,2038.01.01,ROOTHASH," +
+		"Included,Included,Included,Included\n"
+	writeTempCSV(t, cacheDir, csv, p)
+	set, bySKI, err := LoadCCADBChainData(p)
+	require.NoError(t, err)
+	assert.Contains(t, set, "AAAAAA")
+	assert.Contains(t, set, "BBBBBB")
+	rootRow := bySKI["BBBBBB"]
+	assert.Contains(t, strings.ToLower(rootRow.RecordType), "root")
+	assert.Equal(t, "My Root", rootRow.CertificateName)
+	assert.Equal(t, "ROOTHASH", rootRow.SHA256)
 }
 
 func TestLoadCCADBSummary(t *testing.T) {

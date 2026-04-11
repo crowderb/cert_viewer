@@ -33,12 +33,51 @@ func mustMakeDER(t *testing.T) []byte {
 	return der
 }
 
+func TestIsSelfSigned(t *testing.T) {
+	der := mustMakeDER(t)
+	cert, err := x509.ParseCertificate(der)
+	require.NoError(t, err)
+	assert.False(t, isSelfSigned(cert), "minimal non-CA cert is not treated as a trust root")
+
+	// Issued by a different CA (not self-signed).
+	caKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	caTmpl := &x509.Certificate{
+		SerialNumber:          big.NewInt(2),
+		Subject:               pkix.Name{CommonName: "Test CA"},
+		NotBefore:             time.Now().Add(-time.Hour),
+		NotAfter:              time.Now().Add(time.Hour),
+		BasicConstraintsValid: true,
+		IsCA:                  true,
+		KeyUsage:              x509.KeyUsageCertSign,
+	}
+	caDER, err := x509.CreateCertificate(rand.Reader, caTmpl, caTmpl, &caKey.PublicKey, caKey)
+	require.NoError(t, err)
+	eeKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+	eeTmpl := &x509.Certificate{
+		SerialNumber: big.NewInt(3),
+		Subject:      pkix.Name{CommonName: "ee"},
+		NotBefore:    time.Now().Add(-time.Hour),
+		NotAfter:     time.Now().Add(time.Hour),
+	}
+	eeDER, err := x509.CreateCertificate(rand.Reader, eeTmpl, caTmpl, &eeKey.PublicKey, caKey)
+	require.NoError(t, err)
+	eeCert, err := x509.ParseCertificate(eeDER)
+	require.NoError(t, err)
+	assert.False(t, isSelfSigned(eeCert))
+
+	caCert, err := x509.ParseCertificate(caDER)
+	require.NoError(t, err)
+	assert.True(t, isSelfSigned(caCert))
+}
+
 func TestFetchRemoteCert(t *testing.T) {
 	tests := []struct {
-		name      string
-		handler   http.HandlerFunc
-		cancelCtx bool
-		wantErr   bool
+		name        string
+		handler     http.HandlerFunc
+		cancelCtx   bool
+		wantErr     bool
 		errContains string
 	}{
 		{

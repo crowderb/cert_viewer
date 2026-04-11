@@ -3,12 +3,14 @@ package dialogs
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strconv"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 
 	"cert_viewer/internal/prefs"
@@ -88,6 +90,21 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 	// CCADB URL
 	urlEntry := widget.NewEntry()
 	urlEntry.SetText(p.Resources.CCADBURL)
+	ccadbResourcesPage := "https://www.ccadb.org/resources"
+	ccadbResourcesParsed, _ := url.Parse(ccadbResourcesPage)
+	helpMutedItalic := widget.RichTextStyle{
+		ColorName: theme.ColorNameDisabled,
+		TextStyle: fyne.TextStyle{Italic: true},
+	}
+	ccadbURLHelp := widget.NewRichText(
+		&widget.TextSegment{
+			Text:  "The latest CCADB CSV download URL is listed on ",
+			Style: helpMutedItalic,
+		},
+		&widget.HyperlinkSegment{Text: ccadbResourcesPage, URL: ccadbResourcesParsed},
+		&widget.TextSegment{Text: ".", Style: helpMutedItalic},
+	)
+	ccadbURLHelp.Wrapping = fyne.TextWrapWord
 
 	// Refresh Days
 	daysEntry := widget.NewEntry()
@@ -111,6 +128,7 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 		widget.NewLabel("Resources:"),
 		widget.NewLabel("CCADB URL:"),
 		urlEntry,
+		ccadbURLHelp,
 		widget.NewLabel("Refresh Days:"),
 		daysEntry,
 	)
@@ -156,7 +174,7 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 		_ = prefs.Save(p)
 		onApply(p)
 	}, win)
-	d.Resize(fyne.NewSize(540, 460))
+	d.Resize(fyne.NewSize(540, 500))
 	d.Show()
 }
 

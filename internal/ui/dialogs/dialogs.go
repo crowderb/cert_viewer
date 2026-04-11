@@ -180,7 +180,8 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 
 // ShowOpenURL displays an input dialog for connecting to a TLS server by
 // hostname or HTTPS URL. onSubmit is called with the raw input and skipVerify
-// flag when the user clicks Connect; nothing is called on Cancel.
+// flag when the user clicks Connect or presses Enter in the URL field; nothing
+// is called on Cancel. The URL field receives focus when the dialog opens.
 func ShowOpenURL(win fyne.Window, onSubmit func(rawInput string, skipVerify bool)) {
 	hostEntry := widget.NewEntry()
 	hostEntry.SetPlaceHolder("e.g. example.com or https://example.com:8443")
@@ -190,14 +191,30 @@ func ShowOpenURL(win fyne.Window, onSubmit func(rawInput string, skipVerify bool
 		hostEntry,
 		skipCheck,
 	)
-	d := dialog.NewCustomConfirm("Open URL", "Connect", "Cancel", content, func(ok bool) {
-		if !ok {
-			return
-		}
+
+	d := dialog.NewCustomWithoutButtons("Open URL", content, win)
+	connect := func() {
+		d.Hide()
 		onSubmit(hostEntry.Text, skipCheck.Checked)
-	}, win)
+	}
+	cancelBtn := widget.NewButtonWithIcon("Cancel", theme.CancelIcon(), func() { d.Hide() })
+	connectBtn := widget.NewButtonWithIcon("Connect", theme.ConfirmIcon(), connect)
+	connectBtn.Importance = widget.HighImportance
+	d.SetButtons([]fyne.CanvasObject{
+		container.NewGridWithColumns(2, cancelBtn, connectBtn),
+	})
+
+	hostEntry.OnSubmitted = func(string) {
+		connect()
+	}
+
 	d.Resize(fyne.NewSize(520, 200))
 	d.Show()
+	if app := fyne.CurrentApp(); app != nil && app.Driver() != nil {
+		if c := app.Driver().CanvasForObject(hostEntry); c != nil {
+			c.Focus(hostEntry)
+		}
+	}
 }
 
 // ShowPasswordPrompt displays a password entry dialog for opening an encrypted

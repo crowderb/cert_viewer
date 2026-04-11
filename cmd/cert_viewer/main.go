@@ -67,9 +67,12 @@ func main() {
 	// Advanced tab content placeholder
 	advancedContent := container.NewVBox()
 
-	// Compare tab: 3-column comparison grid + content wrapper (header pinned, grid scrolls)
+	// Compare tab: header in top VBox; grid in a VScroll in the Border center so the
+	// scroll gets remaining height (plain VBox only gives Scroll its ~32px MinSize).
 	compareGrid := container.New(compare.NewCompareLayout())
-	compareContent := container.NewVBox()
+	compareScroll := container.NewVScroll(compareGrid)
+	compareTop := container.NewVBox()
+	compareContent := container.NewBorder(compareTop, nil, nil, nil, compareScroll)
 
 	// Tabs
 	tabs := container.NewAppTabs(
@@ -568,15 +571,19 @@ func main() {
 
 	// renderCompareTab rebuilds the Compare tab content based on current state.
 	renderCompareTab = func() {
-		compareContent.Objects = nil
+		compareTop.Objects = nil
 
 		if currentCert == nil && currentCSR == nil {
-			compareContent.Add(widget.NewLabel("Open a certificate to begin."))
+			compareScroll.Hide()
+			compareTop.Add(widget.NewLabel("Open a certificate to begin."))
+			compareTop.Refresh()
 			compareContent.Refresh()
 			return
 		}
 		if currentCSR != nil {
-			compareContent.Add(widget.NewLabel("Certificate comparison is not available for CSRs."))
+			compareScroll.Hide()
+			compareTop.Add(widget.NewLabel("Certificate comparison is not available for CSRs."))
+			compareTop.Refresh()
 			compareContent.Refresh()
 			return
 		}
@@ -592,17 +599,21 @@ func main() {
 		} else {
 			rightWidget = widget.NewButton("Load Certificate B...", openCertB)
 		}
-		compareContent.Add(container.NewBorder(nil, nil, headerA, nil, rightWidget))
-		compareContent.Add(widget.NewSeparator())
+		compareTop.Add(container.NewBorder(nil, nil, headerA, nil, rightWidget))
+		compareTop.Add(widget.NewSeparator())
 
 		if currentCertB != nil {
+			compareScroll.Show()
 			compare.Render(window, compareGrid, currentCert, currentCertB, userPreferences)
-			compareContent.Add(container.NewVScroll(compareGrid))
+			compareScroll.Refresh()
 		} else {
-			compareContent.Add(widget.NewLabel("Load a second certificate using the button above to compare."))
+			compareScroll.Hide()
+			compareTop.Add(widget.NewLabel("Load a second certificate using the button above to compare."))
 		}
+		compareTop.Refresh()
 		compareContent.Refresh()
 	}
+	renderCompareTab()
 
 	// Enable drag-and-drop to open certificate files
 	window.SetOnDropped(func(pos fyne.Position, uris []fyne.URI) {

@@ -14,7 +14,8 @@ import (
 
 const macOSSystemRootKeychain = "/System/Library/Keychains/SystemRootCertificates.keychain"
 
-func collectRoots(ctx context.Context) ([]LocalRootSummary, string, error) {
+// enumerateSystemRootCertificates loads PEM-encoded roots from the macOS system root keychain.
+func enumerateSystemRootCertificates(ctx context.Context) ([]*x509.Certificate, string, error) {
 	source := "macOS Keychain: " + macOSSystemRootKeychain
 
 	cmd := exec.CommandContext(ctx, "security", "find-certificate", "-a", "-p", macOSSystemRootKeychain)
@@ -23,7 +24,7 @@ func collectRoots(ctx context.Context) ([]LocalRootSummary, string, error) {
 		return nil, source, fmt.Errorf("security find-certificate: %w", err)
 	}
 
-	var roots []LocalRootSummary
+	var outCerts []*x509.Certificate
 	data := out
 	for {
 		var block *pem.Block
@@ -38,6 +39,18 @@ func collectRoots(ctx context.Context) ([]LocalRootSummary, string, error) {
 		if err != nil {
 			continue
 		}
+		outCerts = append(outCerts, cert)
+	}
+	return outCerts, source, nil
+}
+
+func collectRoots(ctx context.Context) ([]LocalRootSummary, string, error) {
+	certs, source, err := enumerateSystemRootCertificates(ctx)
+	if err != nil {
+		return nil, source, err
+	}
+	roots := make([]LocalRootSummary, 0, len(certs))
+	for _, cert := range certs {
 		sha := sha256.Sum256(cert.Raw)
 		roots = append(roots, LocalRootSummary{
 			Subject:              cert.Subject.String(),

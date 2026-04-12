@@ -343,13 +343,13 @@ func LoadCCADBChainData(p prefs.Preferences) (skiSet map[string]struct{}, bySKI 
 		if errors.Is(err, os.ErrNotExist) {
 			return map[string]struct{}{}, map[string]CCADBRow{}, nil
 		}
-		return nil, nil, err
+		return map[string]struct{}{}, map[string]CCADBRow{}, err
 	}
 	defer f.Close()
 	r := csv.NewReader(f)
 	header, err := r.Read()
 	if err != nil {
-		return nil, nil, err
+		return map[string]struct{}{}, map[string]CCADBRow{}, err
 	}
 	skiIdx, nameIdx, typeIdx, fromIdx, toIdx, shaIdx, akiIdx := -1, -1, -1, -1, -1, -1, -1
 	appleIdx, chromeIdx, msIdx, mozIdx := -1, -1, -1, -1

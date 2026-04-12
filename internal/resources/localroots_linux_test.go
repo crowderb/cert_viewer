@@ -7,6 +7,8 @@ import (
 	"os"
 	"testing"
 
+	"cert_viewer/internal/certs"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -30,4 +32,28 @@ func TestEnsureLocalRootsJSON_Integration(t *testing.T) {
 	// Second call should be a no-op (returns nil without rebuilding).
 	err = EnsureLocalRootsJSON(context.Background())
 	assert.NoError(t, err)
+}
+
+// TestFindTrustedRootCertBySubjectKeyID_Integration checks SKI lookup against the live bundle.
+func TestFindTrustedRootCertBySubjectKeyID_Integration(t *testing.T) {
+	if _, err := os.Stat(defaultLinuxBundle); os.IsNotExist(err) {
+		t.Skip("Linux certificate bundle not found at " + defaultLinuxBundle)
+	}
+	withTempCache(t)
+	require.NoError(t, EnsureLocalRootsJSON(context.Background()))
+
+	m, err := LoadLocalRootsSKISet()
+	require.NoError(t, err)
+	require.NotEmpty(t, m)
+
+	var skiKey string
+	for k := range m {
+		skiKey = k
+		break
+	}
+
+	cert, err := FindTrustedRootCertBySubjectKeyID(context.Background(), skiKey)
+	require.NoError(t, err)
+	require.NotNil(t, cert)
+	assert.Equal(t, skiKey, certs.NormalizeHexBytesNoSepUpper(cert.SubjectKeyId))
 }

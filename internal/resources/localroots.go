@@ -2,6 +2,7 @@ package resources
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"math/big"
@@ -9,8 +10,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"cert_viewer/internal/certs"
 	"cert_viewer/internal/prefs"
 )
+
+// ErrTrustedRootNotFound means no system trust-store certificate matched the given SKI.
+var ErrTrustedRootNotFound = errors.New("trusted root certificate not found for subject key identifier")
 
 const localRootsFileName = "local_roots.json"
 
@@ -152,4 +157,25 @@ func normalizeHexString(s string) string {
 		}
 	}
 	return string(out)
+}
+
+// FindTrustedRootCertBySubjectKeyID returns a parsed root from the same source used to build
+// local_roots.json whose Subject Key Identifier matches normalizedSKI (hex, no separators, A–F).
+func FindTrustedRootCertBySubjectKeyID(ctx context.Context, normalizedSKI string) (*x509.Certificate, error) {
+	if normalizedSKI == "" {
+		return nil, ErrTrustedRootNotFound
+	}
+	parsed, _, err := enumerateSystemRootCertificates(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, c := range parsed {
+		if len(c.SubjectKeyId) == 0 {
+			continue
+		}
+		if certs.NormalizeHexBytesNoSepUpper(c.SubjectKeyId) == normalizedSKI {
+			return c, nil
+		}
+	}
+	return nil, ErrTrustedRootNotFound
 }

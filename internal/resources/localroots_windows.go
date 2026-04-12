@@ -17,7 +17,8 @@ import (
 
 const windowsRootStoreName = "ROOT"
 
-func collectRoots(_ context.Context) ([]LocalRootSummary, string, error) {
+// enumerateSystemRootCertificates returns parsed certificates from the Windows ROOT store.
+func enumerateSystemRootCertificates(_ context.Context) ([]*x509.Certificate, string, error) {
 	source := "Windows Certificate Store: " + windowsRootStoreName
 
 	storeName, err := windows.UTF16PtrFromString(windowsRootStoreName)
@@ -30,7 +31,7 @@ func collectRoots(_ context.Context) ([]LocalRootSummary, string, error) {
 	}
 	defer windows.CertCloseStore(store, 0) //nolint:errcheck
 
-	var roots []LocalRootSummary
+	var out []*x509.Certificate
 	var prev *windows.CertContext
 	for {
 		ctx, err := windows.CertEnumCertificatesInStore(store, prev)
@@ -51,7 +52,19 @@ func collectRoots(_ context.Context) ([]LocalRootSummary, string, error) {
 			prev = ctx
 			continue
 		}
+		out = append(out, cert)
+		prev = ctx
+	}
+	return out, source, nil
+}
 
+func collectRoots(ctx context.Context) ([]LocalRootSummary, string, error) {
+	certs, source, err := enumerateSystemRootCertificates(ctx)
+	if err != nil {
+		return nil, source, err
+	}
+	roots := make([]LocalRootSummary, 0, len(certs))
+	for _, cert := range certs {
 		sha := sha256.Sum256(cert.Raw)
 		roots = append(roots, LocalRootSummary{
 			Subject:              cert.Subject.String(),
@@ -61,7 +74,6 @@ func collectRoots(_ context.Context) ([]LocalRootSummary, string, error) {
 			NotAfter:             cert.NotAfter.Format("2006-01-02 15:04:05 MST"),
 			SHA256FingerprintHex: hex.EncodeToString(sha[:]),
 		})
-		prev = ctx
 	}
 	return roots, source, nil
 }

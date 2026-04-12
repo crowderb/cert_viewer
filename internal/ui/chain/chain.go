@@ -39,8 +39,9 @@ func isSelfSigned(cert *x509.Certificate) bool {
 	if cert.CheckSignatureFrom(cert) == nil {
 		return true
 	}
-	if len(cert.AuthorityKeyId) > 0 && len(cert.SubjectKeyId) > 0 {
-		return certs.NormalizeHexBytesNoSepUpper(cert.AuthorityKeyId) == certs.NormalizeHexBytesNoSepUpper(cert.SubjectKeyId)
+	aki := certs.AuthorityKeyIdentifierKeyID(cert)
+	if len(aki) > 0 && len(cert.SubjectKeyId) > 0 {
+		return certs.NormalizeHexBytesNoSepUpper(aki) == certs.NormalizeHexBytesNoSepUpper(cert.SubjectKeyId)
 	}
 	return false
 }
@@ -54,9 +55,9 @@ func certDetailScroll(win fyne.Window, cert *x509.Certificate, p prefs.Preferenc
 		grid.Add(ui.BoldLabel("Subject Key Identifier"))
 		grid.Add(ui.CopyRow(win, certs.FormatHex(cert.SubjectKeyId, string(p.UI.HexSep))))
 	}
-	if len(cert.AuthorityKeyId) > 0 {
+	if aki := certs.AuthorityKeyIdentifierKeyID(cert); len(aki) > 0 {
 		grid.Add(ui.BoldLabel("Authority Key Identifier"))
-		grid.Add(ui.CopyRow(win, certs.FormatHex(cert.AuthorityKeyId, string(p.UI.HexSep))))
+		grid.Add(ui.CopyRow(win, certs.FormatHex(aki, string(p.UI.HexSep))))
 	}
 	return container.NewVScroll(grid)
 }
@@ -67,34 +68,10 @@ func buildCertTab(win fyne.Window, title string, cert *x509.Certificate, p prefs
 }
 
 // buildRootTab builds a tab with full certificate details. errorMsg uses error color (e.g. local-only
-// trust); warningMsg uses warning color (e.g. chain stopped on an intermediate).
-func buildRootTab(win fyne.Window, title string, cert *x509.Certificate, p prefs.Preferences, errorMsg, warningMsg string) *container.TabItem {
+// trust); warningMsg uses warning color (e.g. chain stopped on an intermediate); infoMsg uses muted italic.
+func buildRootTab(win fyne.Window, title string, cert *x509.Certificate, p prefs.Preferences, errorMsg, warningMsg, infoMsg string) *container.TabItem {
 	scroll := certDetailScroll(win, cert, p)
-	var parts []fyne.CanvasObject
-	if errorMsg != "" {
-		rt := widget.NewRichText(&widget.TextSegment{
-			Text: errorMsg,
-			Style: widget.RichTextStyle{
-				ColorName: theme.ColorNameError,
-				TextStyle: fyne.TextStyle{Bold: true},
-			},
-		})
-		rt.Wrapping = fyne.TextWrapWord
-		parts = append(parts, rt)
-	}
-	if warningMsg != "" {
-		wt := widget.NewRichText(&widget.TextSegment{
-			Text:  warningMsg,
-			Style: widget.RichTextStyle{ColorName: theme.ColorNameWarning},
-		})
-		wt.Wrapping = fyne.TextWrapWord
-		parts = append(parts, wt)
-	}
-	if len(parts) == 0 {
-		return container.NewTabItem(title, scroll)
-	}
-	top := container.NewVBox(parts...)
-	body := container.NewBorder(top, nil, nil, nil, scroll)
+	body := tabBodyWithNotices(scroll, errorMsg, warningMsg, infoMsg)
 	return container.NewTabItem(title, body)
 }
 
@@ -112,15 +89,15 @@ func appendTerminalRootTab(chainTabs *container.AppTabs, win fyne.Window, root *
 	_, inLocal := localSet[key]
 	switch {
 	case inCCADB:
-		chainTabs.Append(buildRootTab(win, "Root (from CCADB)", root, p, "", ""))
+		chainTabs.Append(buildRootTab(win, "Root (from CCADB)", root, p, "", "", ""))
 	case inLocal:
 		errMsg := ""
 		if !inCCADB {
 			errMsg = rootLocalNotCCADBMsg
 		}
-		chainTabs.Append(buildRootTab(win, "Root (from Local Store)", root, p, errMsg, ""))
+		chainTabs.Append(buildRootTab(win, "Root (from Local Store)", root, p, errMsg, "", ""))
 	default:
-		chainTabs.Append(buildRootTab(win, "Root (self-signed)", root, p, "", ""))
+		chainTabs.Append(buildRootTab(win, "Root (self-signed)", root, p, "", "", ""))
 	}
 }
 
@@ -130,16 +107,16 @@ func appendTrustAnchorTab(chainTabs *container.AppTabs, win fyne.Window, cert *x
 	var errMsg string
 	switch {
 	case inCCADB:
-		title = "Trusted CA (from CCADB)"
+		title = "Trusted intermediate (from CCADB)"
 	case inLocal:
-		title = "Trusted CA (from Local Store)"
+		title = "Trusted intermediate (from Local Store)"
 		if !inCCADB {
 			errMsg = rootLocalNotCCADBMsg
 		}
 	default:
 		return
 	}
-	chainTabs.Append(buildRootTab(win, title, cert, p, errMsg, trustAnchorNotRootNoAIAMsg))
+	chainTabs.Append(buildRootTab(win, title, cert, p, errMsg, trustAnchorNotRootNoAIAMsg, ""))
 }
 
 func isRootRecordType(recordType string) bool {
@@ -208,7 +185,7 @@ func tabBodyWithNotices(scroll fyne.CanvasObject, errorMsg, warningMsg, infoMsg 
 			},
 		})
 		it.Wrapping = fyne.TextWrapWord
-		parts = append(parts, it)
+		parts = append(parts, container.NewThemeOverride(it, infoNoticeTheme{}))
 	}
 	if len(parts) == 0 {
 		return scroll
@@ -276,6 +253,7 @@ func buildLocalMetadataRootTab(win fyne.Window, loc resources.LocalRootSummary, 
 // tryAppendParentViaAuthorityKeyID adds a root/parent tab from local store or CCADB when the
 // intermediate has no CA Issuers URL but its AKI matches another CA’s SKI in those sources.
 func tryAppendParentViaAuthorityKeyID(
+	ctx context.Context,
 	chainTabs *container.AppTabs,
 	win fyne.Window,
 	intermediate *x509.Certificate,
@@ -284,12 +262,26 @@ func tryAppendParentViaAuthorityKeyID(
 	ccadbSet map[string]struct{},
 	ccadbBySKI map[string]resources.CCADBRow,
 ) bool {
-	if len(intermediate.AuthorityKeyId) == 0 {
+	aki := certs.AuthorityKeyIdentifierKeyID(intermediate)
+	if len(aki) == 0 {
 		return false
 	}
-	parentKey := certs.NormalizeHexBytesNoSepUpper(intermediate.AuthorityKeyId)
+	parentKey := certs.NormalizeHexBytesNoSepUpper(aki)
 	if parentKey == "" {
 		return false
+	}
+
+	// Prefer the live system trust bundle (same source as collectRoots). The local_roots.json
+	// index can be stale or disagree on normalization with cert AKI bytes; skipping that gate
+	// avoids showing the intermediate again under a "trusted root" tab when the parent exists
+	// on disk but was missing from the JSON map.
+	if rootCert, err := resources.FindTrustedRootCertBySubjectKeyID(ctx, parentKey); err == nil && rootCert != nil {
+		errMsg := ""
+		if _, inC := ccadbSet[parentKey]; !inC {
+			errMsg = rootLocalNotCCADBMsg
+		}
+		chainTabs.Append(buildRootTab(win, "Root (from Local Store)", rootCert, p, errMsg, "", resolvedParentViaAKIMsg))
+		return true
 	}
 
 	if loc, ok := localSet[parentKey]; ok {
@@ -403,16 +395,19 @@ func Build(ctx context.Context, win fyne.Window, chainTabs *container.AppTabs, l
 			_, inCCADB := ccadbSet[key]
 			_, inLocal := localSet[key]
 			if inCCADB || inLocal {
+				// Resolve parent by AKI against CCADB / OS trust store before relying on AIA.
+				// Otherwise a CCADB-listed CA that still has a CA Issuers URL never gets
+				// tryAppendParentViaAuthorityKeyID (BuildFromCerts had the same gap).
+				if tryAppendParentViaAuthorityKeyID(ctx, chainTabs, win, issuerCert, p, localSet, ccadbSet, ccadbBySKI) {
+					chainTabs.Refresh()
+					return
+				}
 				if len(issuerCert.IssuingCertificateURL) == 0 {
-					if tryAppendParentViaAuthorityKeyID(chainTabs, win, issuerCert, p, localSet, ccadbSet, ccadbBySKI) {
-						chainTabs.Refresh()
-						return
-					}
 					appendTrustAnchorTab(chainTabs, win, issuerCert, p, inCCADB, inLocal)
 					chainTabs.Refresh()
 					return
 				}
-				// Trusted intermediate with AIA — fetch the parent (real root).
+				// Trusted in CCADB/local but parent not resolved here — follow CA Issuers URL next.
 			}
 
 			current = issuerCert
@@ -463,11 +458,9 @@ func BuildFromCerts(win fyne.Window, chainTabs *container.AppTabs, certList []*x
 	_, inCCADB := ccadbSet[key]
 	_, inLocal := localSet[key]
 	if inCCADB || inLocal {
-		if len(last.IssuingCertificateURL) == 0 {
-			if tryAppendParentViaAuthorityKeyID(chainTabs, win, last, p, localSet, ccadbSet, ccadbBySKI) {
-				chainTabs.Refresh()
-				return
-			}
+		if tryAppendParentViaAuthorityKeyID(context.Background(), chainTabs, win, last, p, localSet, ccadbSet, ccadbBySKI) {
+			chainTabs.Refresh()
+			return
 		}
 		appendTrustAnchorTab(chainTabs, win, last, p, inCCADB, inLocal)
 	}

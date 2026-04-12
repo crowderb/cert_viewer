@@ -15,7 +15,8 @@ import (
 
 const defaultLinuxBundle = "/etc/ssl/certs/ca-certificates.crt"
 
-func collectRoots(_ context.Context) ([]LocalRootSummary, string, error) {
+// enumerateSystemRootCertificates parses PEM certificates from the system CA bundle.
+func enumerateSystemRootCertificates(_ context.Context) ([]*x509.Certificate, string, error) {
 	source := defaultLinuxBundle
 	f, err := os.Open(source)
 	if err != nil {
@@ -29,7 +30,7 @@ func collectRoots(_ context.Context) ([]LocalRootSummary, string, error) {
 	if err != nil {
 		return nil, source, err
 	}
-	var roots []LocalRootSummary
+	var out []*x509.Certificate
 	for {
 		var block *pem.Block
 		block, data = pem.Decode(data)
@@ -43,6 +44,18 @@ func collectRoots(_ context.Context) ([]LocalRootSummary, string, error) {
 		if err != nil {
 			continue
 		}
+		out = append(out, cert)
+	}
+	return out, source, nil
+}
+
+func collectRoots(ctx context.Context) ([]LocalRootSummary, string, error) {
+	certs, source, err := enumerateSystemRootCertificates(ctx)
+	if err != nil {
+		return nil, source, err
+	}
+	roots := make([]LocalRootSummary, 0, len(certs))
+	for _, cert := range certs {
 		sha := sha256.Sum256(cert.Raw)
 		roots = append(roots, LocalRootSummary{
 			Subject:              cert.Subject.String(),

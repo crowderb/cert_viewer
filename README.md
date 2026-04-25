@@ -69,6 +69,26 @@ certificate comparison.
 - CCADB entries filtered to exclude "Not Trusted" (Apple/Chrome/Microsoft/Mozilla)
   and expired certificates
 - Preference `showCCADBOnlyCerts` toggles visibility of the CCADB-only section
+- Each cert row shows an `Origins:` line listing where it was observed
+  (e.g. `system-bundle, distro-anchor-dir`)
+
+### Trust Sources (Resources Menu, Linux)
+
+- Per-origin breakdown of every root the cache has indexed, expandable per cert
+- One section per source, each with its own count:
+  - **System bundle** — `/etc/ssl/certs/ca-certificates.crt` and equivalents
+  - **Env override** — `SSL_CERT_FILE` or `SSL_CERT_DIR`
+  - **Distro anchor dir** — `/usr/local/share/ca-certificates` (Debian-family),
+    `/etc/pki/ca-trust/source/anchors` (RHEL), `/etc/ca-certificates/trust-source/anchors`
+    (Arch), `/etc/pki/trust/anchors` (SUSE) — selected from `/etc/os-release`
+  - **NSS — user** — `~/.pki/nssdb` (used by Chrome/Chromium, libnss-based apps)
+  - **NSS — Firefox profile** — each `~/.mozilla/firefox/<profile>/cert9.db`
+- The same cert can appear under multiple origins (e.g. a homelab CA installed
+  via `update-ca-certificates` shows under both system-bundle and distro-anchor-dir)
+- NSS sections require `certutil` from `libnss3-tools`; if missing, the section
+  shows a clear note instead of failing
+- macOS keychain split (System / login / SystemRoots) and Windows CurrentUser /
+  GPO additions are deliberate follow-up items under section 3 of the roadmap
 
 ### File Management
 
@@ -96,11 +116,18 @@ certificate comparison.
 
 ### Local Trust Store
 
-- **Linux (Debian/Ubuntu):** Parses `/etc/ssl/certs/ca-certificates.crt` on demand
+- **Linux:** Parses the configured bundle (`SSL_CERT_FILE`, `SSL_CERT_DIR`, or
+  `/etc/ssl/certs/ca-certificates.crt` by default), then merges in the per-distro
+  anchor directory and per-user NSS DBs (Chrome `~/.pki/nssdb`, Firefox profiles)
+  via `certutil`
 - **Windows:** Reads the Windows `ROOT` certificate store via the Windows API
-- **macOS:** Security framework integration (stub; returns empty for now)
-- Caches per-certificate metadata (Subject, SKI, Not Before, Not After, SHA-256) as
-  `local_roots.json` for fast subsequent comparisons
+- **macOS:** Reads `/System/Library/Keychains/SystemRootCertificates.keychain` via
+  `security find-certificate`
+- Caches per-certificate metadata as `local_roots.json` (Subject, SKI, Not Before,
+  Not After, SHA-256, plus an `origins` list recording every source the cert was
+  observed in). Cache regenerates automatically when the resolved source path
+  changes (e.g. `SSL_CERT_FILE` was set/unset between runs) or when the source's
+  mtime is newer than the cache.
 
 ---
 

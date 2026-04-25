@@ -94,11 +94,26 @@ func TestNeedsRegen(t *testing.T) {
 		f := filepath.Join(t.TempDir(), "current.json")
 		lrf := localRootsFile{
 			Roots: []LocalRootSummary{
-				{Subject: "CN=Test", SerialHex: "ABCDEF"},
+				{
+					Subject:   "CN=Test",
+					SerialHex: "ABCDEF",
+					Origins:   []OriginRef{{Type: OriginSystemBundle, Path: "/etc/ssl/certs/ca-certificates.crt"}},
+				},
 			},
 		}
 		require.NoError(t, writeLocalRoots(f, lrf))
 		assert.False(t, needsRegen(f))
+	})
+
+	t.Run("first root missing Origins is treated as pre-3.B legacy", func(t *testing.T) {
+		f := filepath.Join(t.TempDir(), "no-origins.json")
+		lrf := localRootsFile{
+			Roots: []LocalRootSummary{
+				{Subject: "CN=Test", SerialHex: "ABCDEF"}, // valid serial, but no Origins
+			},
+		}
+		require.NoError(t, writeLocalRoots(f, lrf))
+		assert.True(t, needsRegen(f))
 	})
 }
 

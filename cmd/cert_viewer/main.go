@@ -30,6 +30,7 @@ import (
 	"cert_viewer/internal/ui/compare"
 	"cert_viewer/internal/ui/dialogs"
 	"cert_viewer/internal/ui/summary"
+	"cert_viewer/internal/ui/trustsources"
 )
 
 func main() {
@@ -66,6 +67,8 @@ func main() {
 	chainTabs := container.NewAppTabs()
 	// Advanced tab content placeholder
 	advancedContent := container.NewVBox()
+	// Trust Sources tab content placeholder
+	trustSourcesContent := container.NewVBox()
 
 	// Compare tab: header in top VBox; grid in a VScroll in the Border center so the
 	// scroll gets remaining height (plain VBox only gives Scroll its ~32px MinSize).
@@ -80,6 +83,7 @@ func main() {
 		container.NewTabItem("Details", detailsScroll),
 		container.NewTabItem("Chain", chainTabs),
 		container.NewTabItem("Advanced", container.NewVScroll(advancedContent)),
+		container.NewTabItem("Trust Sources", container.NewVScroll(trustSourcesContent)),
 		container.NewTabItem("Compare", compareContent),
 	)
 
@@ -437,6 +441,15 @@ func main() {
 				advanced.Build(advancedContent, userPreferences)
 			}()
 			tabs.SelectIndex(3) // Advanced tab
+		}),
+		fyne.NewMenuItem("Trust Sources", func() {
+			trustSourcesContent.Objects = []fyne.CanvasObject{widget.NewLabel("Gathering trust sources...")}
+			trustSourcesContent.Refresh()
+			go func() {
+				_ = resources.EnsureLocalRootsJSON(context.Background())
+				trustsources.Build(trustSourcesContent, userPreferences)
+			}()
+			tabs.SelectIndex(4) // Trust Sources tab
 		}),
 	)
 	rebuildMainMenu = func() {

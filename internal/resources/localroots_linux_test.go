@@ -235,6 +235,7 @@ func TestEnumerateSystemRootCertificates_Overrides(t *testing.T) {
 
 func TestEnsureLocalRootsJSON_RegensWhenBundleNewer(t *testing.T) {
 	withTempCache(t)
+	withIsolatedTrustEnvironment(t)
 	dir := t.TempDir()
 	bundle := filepath.Join(dir, "bundle.pem")
 	require.NoError(t, os.WriteFile(bundle, makeTestPEM(t, "v1"), 0o644))
@@ -264,6 +265,7 @@ func TestEnsureLocalRootsJSON_RegensWhenBundleNewer(t *testing.T) {
 
 func TestEnsureLocalRootsJSON_RegensWhenSourceChanges(t *testing.T) {
 	withTempCache(t)
+	withIsolatedTrustEnvironment(t)
 	dir := t.TempDir()
 	bundleA := filepath.Join(dir, "a.pem")
 	bundleB := filepath.Join(dir, "b.pem")
@@ -284,8 +286,78 @@ func TestEnsureLocalRootsJSON_RegensWhenSourceChanges(t *testing.T) {
 	assert.Equal(t, []string{"CN=from-B"}, rootSubjects(final.Roots))
 }
 
+// --- mergeTrustEntries ---
+
+// makeTestCert returns a parsed certificate for use in mergeTrustEntries
+// tests. Reuses makeTestPEM and parses it back.
+func makeTestCert(t *testing.T, cn string) *x509.Certificate {
+	t.Helper()
+	pemBytes := makeTestPEM(t, cn)
+	cert, err := certs.ParseCertificate(pemBytes)
+	require.NoError(t, err)
+	return cert
+}
+
+func TestMergeTrustEntries_DeduplicatesBySHA256(t *testing.T) {
+	c := makeTestCert(t, "shared")
+	entries := []TrustSourceEntry{
+		{Cert: c, OriginType: OriginSystemBundle, OriginPath: "/etc/ssl/certs/ca-certificates.crt"},
+		{Cert: c, OriginType: OriginDistroAnchorDir, OriginPath: "/usr/local/share/ca-certificates/shared.crt"},
+		{Cert: c, OriginType: OriginNSSUser, OriginPath: "/home/user/.pki/nssdb"},
+	}
+	out := mergeTrustEntries(entries)
+	require.Len(t, out, 1, "same SHA-256 should collapse to one summary")
+	assert.Len(t, out[0].Origins, 3)
+
+	var types []string
+	for _, o := range out[0].Origins {
+		types = append(types, o.Type)
+	}
+	assert.Equal(t, []string{OriginSystemBundle, OriginDistroAnchorDir, OriginNSSUser}, types)
+}
+
+func TestMergeTrustEntries_DistinctCertsKeepOrder(t *testing.T) {
+	a := makeTestCert(t, "first")
+	b := makeTestCert(t, "second")
+	c := makeTestCert(t, "third")
+	entries := []TrustSourceEntry{
+		{Cert: a, OriginType: OriginSystemBundle, OriginPath: "/p"},
+		{Cert: b, OriginType: OriginSystemBundle, OriginPath: "/p"},
+		{Cert: c, OriginType: OriginSystemBundle, OriginPath: "/p"},
+	}
+	out := mergeTrustEntries(entries)
+	require.Len(t, out, 3)
+	assert.Equal(t, "CN=first", out[0].Subject)
+	assert.Equal(t, "CN=second", out[1].Subject)
+	assert.Equal(t, "CN=third", out[2].Subject)
+}
+
+func TestMergeTrustEntries_DropsDuplicateOrigins(t *testing.T) {
+	c := makeTestCert(t, "dup-origin")
+	entries := []TrustSourceEntry{
+		{Cert: c, OriginType: OriginSystemBundle, OriginPath: "/p"},
+		{Cert: c, OriginType: OriginSystemBundle, OriginPath: "/p"}, // exact duplicate
+		{Cert: c, OriginType: OriginSystemBundle, OriginPath: "/q"}, // same type, different path → kept
+	}
+	out := mergeTrustEntries(entries)
+	require.Len(t, out, 1)
+	assert.Len(t, out[0].Origins, 2)
+}
+
+func TestMergeTrustEntries_NilCertsAreSkipped(t *testing.T) {
+	c := makeTestCert(t, "real")
+	entries := []TrustSourceEntry{
+		{Cert: nil, OriginType: OriginSystemBundle, OriginPath: "/p"},
+		{Cert: c, OriginType: OriginSystemBundle, OriginPath: "/p"},
+	}
+	out := mergeTrustEntries(entries)
+	require.Len(t, out, 1)
+	assert.Equal(t, "CN=real", out[0].Subject)
+}
+
 func TestEnsureLocalRootsJSON_NoRegenWhenFresh(t *testing.T) {
 	withTempCache(t)
+	withIsolatedTrustEnvironment(t)
 	dir := t.TempDir()
 	bundle := filepath.Join(dir, "bundle.pem")
 	require.NoError(t, os.WriteFile(bundle, makeTestPEM(t, "stable"), 0o644))

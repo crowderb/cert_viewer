@@ -4,9 +4,7 @@ package resources
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/hex"
 	"encoding/pem"
 	"errors"
 	"io"
@@ -177,22 +175,44 @@ func isPEMFilename(name string) bool {
 	return false
 }
 
+// collectRoots gathers root certificates from every Linux trust source
+// (system bundle / env override, distro anchor dir, per-user NSS DBs)
+// and returns one merged LocalRootSummary per unique SHA-256, with each
+// summary's Origins slice listing every source the cert was observed in.
+//
+// The returned source string identifies the system bundle / env override
+// for cache freshness purposes; anchor-dir and NSS contributions still
+// affect the merged result but do not invalidate the cache on their own.
+// Tracking those sources for cache invalidation can be added in a follow-
+// up if frequent NSS edits become a real-world friction point.
 func collectRoots(ctx context.Context) ([]LocalRootSummary, string, error) {
-	certs, source, err := enumerateSystemRootCertificates(ctx)
+	systemCerts, source, err := enumerateSystemRootCertificates(ctx)
 	if err != nil {
 		return nil, source, err
 	}
-	roots := make([]LocalRootSummary, 0, len(certs))
-	for _, cert := range certs {
-		sha := sha256.Sum256(cert.Raw)
-		roots = append(roots, LocalRootSummary{
-			Subject:              cert.Subject.String(),
-			SubjectKeyIdentifier: hex.EncodeToString(cert.SubjectKeyId),
-			SerialHex:            upperNoSep(cert.SerialNumber),
-			NotBefore:            cert.NotBefore.Format("2006-01-02 15:04:05 MST"),
-			NotAfter:             cert.NotAfter.Format("2006-01-02 15:04:05 MST"),
-			SHA256FingerprintHex: hex.EncodeToString(sha[:]),
+
+	systemOrigin := OriginSystemBundle
+	if source != defaultLinuxBundle {
+		systemOrigin = OriginEnvOverride
+	}
+
+	entries := make([]TrustSourceEntry, 0, len(systemCerts))
+	for _, c := range systemCerts {
+		entries = append(entries, TrustSourceEntry{
+			Cert:       c,
+			OriginType: systemOrigin,
+			OriginPath: source,
 		})
 	}
-	return roots, source, nil
+
+	if info, err := DetectDistroFamily(); err == nil && info.AnchorDir != "" {
+		anchorEntries, _ := EnumerateAnchorDir(info.AnchorDir)
+		entries = append(entries, anchorEntries...)
+	}
+
+	for _, res := range EnumerateAllNSSDBs(ctx) {
+		entries = append(entries, res.Entries...)
+	}
+
+	return mergeTrustEntries(entries), source, nil
 }

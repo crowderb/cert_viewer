@@ -33,7 +33,10 @@ type DistroInfo struct {
 	AnchorDir string // empty when family is unknown
 }
 
-const defaultOSReleasePath = "/etc/os-release"
+// osReleasePath is the file DetectDistroFamily reads. It is a package-level
+// var (rather than a const) so tests can point it at a fixture without
+// piping a path argument through every caller.
+var osReleasePath = "/etc/os-release"
 
 // DetectDistroFamily reads /etc/os-release and classifies the host's
 // distribution into one of the supported families. Detection prefers ID over
@@ -45,7 +48,7 @@ const defaultOSReleasePath = "/etc/os-release"
 // unparseable; callers should treat that as "no per-distro anchor dir to
 // enumerate" rather than as an error.
 func DetectDistroFamily() (DistroInfo, error) {
-	return detectDistroFamilyAt(defaultOSReleasePath)
+	return detectDistroFamilyAt(osReleasePath)
 }
 
 func detectDistroFamilyAt(path string) (DistroInfo, error) {

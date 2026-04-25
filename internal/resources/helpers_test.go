@@ -20,6 +20,7 @@ func withTempCache(t *testing.T) string {
 	return filepath.Join(tmp, "cert_viewer")
 }
 
+
 // writeTempCSV writes content to the CCADB CSV path for p within cacheDir.
 func writeTempCSV(t *testing.T, cacheDir, content string, p prefs.Preferences) {
 	t.Helper()

@@ -2,7 +2,9 @@ package resources
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/x509"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"math/big"
@@ -19,13 +21,49 @@ var ErrTrustedRootNotFound = errors.New("trusted root certificate not found for 
 
 const localRootsFileName = "local_roots.json"
 
+// Origin identifiers attached to certificates discovered by the various
+// trust-source readers. They appear in local_roots.json's per-cert
+// Origins list and drive the per-source counts shown in the Trust Sources
+// tab. Adding a new origin only requires choosing a new constant and
+// emitting it from a new reader; downstream consumers (UI grouping, JSON
+// schema) treat the value as opaque.
+const (
+	OriginSystemBundle    = "system-bundle"     // /etc/ssl/certs/ca-certificates.crt or distro equivalent
+	OriginEnvOverride     = "env-override"      // SSL_CERT_FILE / SSL_CERT_DIR
+	OriginDistroAnchorDir = "distro-anchor-dir" // /usr/local/share/ca-certificates etc.
+	OriginNSSUser         = "nss-user"          // ~/.pki/nssdb
+	OriginNSSFirefox      = "nss-firefox"       // ~/.mozilla/firefox/<profile>/cert9.db
+)
+
+// OriginRef identifies one trust source where a root certificate was
+// observed. A single LocalRootSummary may carry multiple OriginRefs when
+// the same cert appears in more than one source — for example, a CA in
+// /usr/local/share/ca-certificates that update-ca-certificates has also
+// concatenated into /etc/ssl/certs/ca-certificates.crt produces two
+// entries: {Type: "system-bundle", …} and {Type: "distro-anchor-dir", …}.
+type OriginRef struct {
+	Type string `json:"type"`
+	Path string `json:"path"`
+}
+
+// TrustSourceEntry pairs a parsed certificate with the origin metadata
+// that describes where it was found. Used as the input to mergeTrustEntries
+// — multiple entries with the same SHA-256 fingerprint collapse into one
+// LocalRootSummary whose Origins list records every source it appeared in.
+type TrustSourceEntry struct {
+	Cert       *x509.Certificate
+	OriginType string // one of the Origin* constants
+	OriginPath string // file path or descriptor that produced this cert
+}
+
 type LocalRootSummary struct {
-	Subject               string `json:"subject"`
-	SubjectKeyIdentifier  string `json:"subjectKeyIdentifier"`
-	SerialHex             string `json:"serialHex"`
-	NotBefore             string `json:"notBefore"`
-	NotAfter              string `json:"notAfter"`
-	SHA256FingerprintHex  string `json:"sha256"`
+	Subject              string      `json:"subject"`
+	SubjectKeyIdentifier string      `json:"subjectKeyIdentifier"`
+	SerialHex            string      `json:"serialHex"`
+	NotBefore            string      `json:"notBefore"`
+	NotAfter             string      `json:"notAfter"`
+	SHA256FingerprintHex string      `json:"sha256"`
+	Origins              []OriginRef `json:"origins,omitempty"`
 }
 
 type localRootsFile struct {
@@ -108,6 +146,64 @@ func writeLocalRoots(path string, content localRootsFile) error {
 	return os.WriteFile(path, b, 0o644)
 }
 
+// summarizeCert builds a LocalRootSummary for a single certificate. The
+// Origins slice is left empty; callers fill it in based on where the cert
+// came from. Centralizing the formatting (date format, hex normalization)
+// avoids drift between the Linux/Darwin/Windows collectRoots paths.
+func summarizeCert(cert *x509.Certificate) LocalRootSummary {
+	sha := sha256.Sum256(cert.Raw)
+	return LocalRootSummary{
+		Subject:              cert.Subject.String(),
+		SubjectKeyIdentifier: hex.EncodeToString(cert.SubjectKeyId),
+		SerialHex:            upperNoSep(cert.SerialNumber),
+		NotBefore:            cert.NotBefore.Format("2006-01-02 15:04:05 MST"),
+		NotAfter:             cert.NotAfter.Format("2006-01-02 15:04:05 MST"),
+		SHA256FingerprintHex: hex.EncodeToString(sha[:]),
+	}
+}
+
+// mergeTrustEntries collapses a slice of TrustSourceEntries into a
+// LocalRootSummary list keyed by SHA-256 fingerprint. Each unique cert
+// appears once; its Origins slice records every source where it was
+// observed. Origins are deduplicated by (Type, Path) so a cert read twice
+// from the same anchor file does not produce duplicate origin entries.
+//
+// Order is preserved by first-seen fingerprint, then by first-seen origin
+// for each cert, which keeps cache output stable when the same set of
+// trust sources is enumerated repeatedly.
+func mergeTrustEntries(entries []TrustSourceEntry) []LocalRootSummary {
+	type slot struct {
+		index int
+		seen  map[string]struct{}
+	}
+	bySHA := make(map[string]*slot, len(entries))
+	out := make([]LocalRootSummary, 0, len(entries))
+
+	for _, e := range entries {
+		if e.Cert == nil {
+			continue
+		}
+		sum := summarizeCert(e.Cert)
+		key := sum.SHA256FingerprintHex
+		s, ok := bySHA[key]
+		if !ok {
+			out = append(out, sum)
+			s = &slot{index: len(out) - 1, seen: make(map[string]struct{})}
+			bySHA[key] = s
+		}
+		originKey := e.OriginType + "|" + e.OriginPath
+		if _, dup := s.seen[originKey]; dup {
+			continue
+		}
+		s.seen[originKey] = struct{}{}
+		out[s.index].Origins = append(out[s.index].Origins, OriginRef{
+			Type: e.OriginType,
+			Path: e.OriginPath,
+		})
+	}
+	return out
+}
+
 func needsRegen(path string) bool {
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -121,7 +217,12 @@ func needsRegen(path string) bool {
 		return false
 	}
 	// If first entry has empty SerialHex, assume legacy format and regenerate.
-	return f.Roots[0].SerialHex == ""
+	if f.Roots[0].SerialHex == "" {
+		return true
+	}
+	// If the first entry has no Origins, the cache predates the per-origin
+	// schema introduced in 3.B. Regenerate so the new fields populate.
+	return len(f.Roots[0].Origins) == 0
 }
 
 func upperNoSep(n *big.Int) string {

@@ -4,9 +4,7 @@ package resources
 
 import (
 	"context"
-	"crypto/sha256"
 	"crypto/x509"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"syscall"
@@ -72,21 +70,17 @@ func enumerateSystemRootCertificates(_ context.Context) ([]*x509.Certificate, st
 }
 
 func collectRoots(ctx context.Context) ([]LocalRootSummary, string, error) {
-	certs, source, err := enumerateSystemRootCertificates(ctx)
+	systemCerts, source, err := enumerateSystemRootCertificates(ctx)
 	if err != nil {
 		return nil, source, err
 	}
-	roots := make([]LocalRootSummary, 0, len(certs))
-	for _, cert := range certs {
-		sha := sha256.Sum256(cert.Raw)
-		roots = append(roots, LocalRootSummary{
-			Subject:              cert.Subject.String(),
-			SubjectKeyIdentifier: hex.EncodeToString(cert.SubjectKeyId),
-			SerialHex:            upperNoSep(cert.SerialNumber),
-			NotBefore:            cert.NotBefore.Format("2006-01-02 15:04:05 MST"),
-			NotAfter:             cert.NotAfter.Format("2006-01-02 15:04:05 MST"),
-			SHA256FingerprintHex: hex.EncodeToString(sha[:]),
+	entries := make([]TrustSourceEntry, 0, len(systemCerts))
+	for _, c := range systemCerts {
+		entries = append(entries, TrustSourceEntry{
+			Cert:       c,
+			OriginType: OriginSystemBundle,
+			OriginPath: source,
 		})
 	}
-	return roots, source, nil
+	return mergeTrustEntries(entries), source, nil
 }

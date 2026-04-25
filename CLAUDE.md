@@ -105,6 +105,25 @@ internal/
 | CCADB CSV cache | `~/.cache/cert_viewer/ccadb_all_certificate_records_v2.csv` |
 | Local roots cache | `~/.cache/cert_viewer/local_roots.json` |
 
+### Trust-Store Source Resolution (Linux)
+
+The local-roots cache is built from a configurable source. On Linux, resolution
+order matches Go's `crypto/x509` and most other TLS-using tools:
+
+1. `SSL_CERT_FILE` — alternate bundle path (used as-is if it exists and is readable)
+2. `SSL_CERT_DIR` — colon-separated list of directories; every `*.pem` / `*.crt`
+   / `*.cer` file in any listed directory is parsed and merged
+3. `/etc/ssl/certs/ca-certificates.crt` — the Debian/Ubuntu default bundle
+
+The resolved source is recorded in `local_roots.json` as `sourcePath` (the
+plain path for a single bundle, or a `DIR:`-prefixed colon-separated list for
+the directory case). The cache is regenerated automatically when the source
+identifier changes between runs (e.g. `SSL_CERT_FILE` was added/removed) or
+when the source's mtime is newer than the cache's mtime (e.g. an admin ran
+`update-ca-certificates`). On macOS and Windows the source identifier is a
+fixed string and the mtime check is skipped, since neither platform exposes a
+single stat-able file for the system trust store.
+
 ---
 
 ## Code Conventions Used in This Project

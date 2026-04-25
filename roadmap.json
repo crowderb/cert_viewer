@@ -1,0 +1,290 @@
+{
+  "$schema_version": "1.0",
+  "project": "cert_viewer",
+  "last_updated": "2026-04-25",
+  "priorities": "1) Testing & coverage \u2192 2) Cross-platform trust-store discovery \u2192 3) Distribution & installers",
+  "notes": [
+    "Phase 1 (Foundation) and most of Phase 2 (platform trust stores, CI/release pipeline), Phase 3 (core features), and Phase 4 (advanced features) completed in 2026-Q1 \u2014 see docs/roadmaps/2026-Q1.md.",
+    "Pre-existing ROADMAP.md is retained read-only until this migration is verified."
+  ],
+  "references": [
+    {
+      "area": "2026-Q1 archive",
+      "style_doc": "docs/roadmaps/2026-Q1.md",
+      "state": "archived"
+    },
+    {
+      "area": "Project guide",
+      "style_doc": "CLAUDE.md",
+      "state": "current"
+    }
+  ],
+  "sections": [
+    {
+      "id": "2",
+      "title": "Platform Support & Distribution",
+      "description": "Installer/bundle outputs and per-OS build guides for end users.",
+      "docs": [],
+      "prerequisites": []
+    },
+    {
+      "id": "3",
+      "title": "Trust Store Discovery",
+      "description": "Detect and surface non-standard / user-added root CAs without hard-coded paths or filesystem scanning. Driven by the discovery that homelab-ca was installed via update-ca-certificates but not surfaced because local_roots.json was stale.",
+      "docs": [],
+      "prerequisites": []
+    }
+  ],
+  "tasks": [
+    {
+      "id": "2.1",
+      "section": "2",
+      "title": "macOS: .app bundle and .dmg disk image",
+      "description": "Produce distributable .app bundle and .dmg for macOS.",
+      "type": "infra",
+      "priority": "high",
+      "effort": "medium",
+      "status": "done",
+      "dependencies": [],
+      "steps": [
+        "Bundle binary as .app",
+        "Package .app into .dmg"
+      ],
+      "acceptance_criteria": [
+        "Signed .app bundle opens on macOS",
+        ".dmg contains the .app and drag-to-Applications affordance"
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": "2026-04-25",
+      "completed_by": "migration",
+      "completion_summary": "Migrated from ROADMAP.md as already-complete.",
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "2.2",
+      "section": "2",
+      "title": "Windows: installer via NSIS or WiX (or go-msi)",
+      "description": "Produce a Windows installer for end users.",
+      "type": "infra",
+      "priority": "high",
+      "effort": "medium",
+      "status": "done",
+      "dependencies": [],
+      "steps": [
+        "Choose installer toolchain (NSIS/WiX/go-msi)",
+        "Produce installer in CI"
+      ],
+      "acceptance_criteria": [
+        "Installer runs on supported Windows versions",
+        "Uninstall removes all installed files"
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": "2026-04-25",
+      "completed_by": "migration",
+      "completion_summary": "Migrated from ROADMAP.md as already-complete.",
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "2.3",
+      "section": "2",
+      "title": "Linux: AppImage for distro-agnostic distribution",
+      "description": "Build an AppImage so Linux users can run cert_viewer without per-distro packaging.",
+      "type": "infra",
+      "priority": "medium",
+      "effort": "medium",
+      "status": "done",
+      "dependencies": [],
+      "steps": [
+        "Configure AppImage tooling",
+        "Produce AppImage in CI"
+      ],
+      "acceptance_criteria": [
+        "AppImage runs on Debian/Ubuntu and Fedora without extra dependencies"
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": "2026-04-25",
+      "completed_by": "migration",
+      "completion_summary": "Migrated from ROADMAP.md as already-complete.",
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "2.4",
+      "section": "2",
+      "title": "BUILD_GUIDE_LINUX.md",
+      "description": "Debian/Ubuntu build guide: apt dependencies, go test, binary + AppImage.",
+      "type": "infra",
+      "priority": "medium",
+      "effort": "small",
+      "status": "done",
+      "dependencies": [],
+      "steps": [
+        "Document apt prerequisites",
+        "Document go test and binary build commands",
+        "Document AppImage packaging"
+      ],
+      "acceptance_criteria": [
+        "A new contributor can build the binary and AppImage on a fresh Ubuntu install by following the guide"
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": "2026-04-25",
+      "completed_by": "migration",
+      "completion_summary": "Migrated from ROADMAP.md as already-complete.",
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "2.5",
+      "section": "2",
+      "title": "BUILD_GUIDE_WINDOWS.md",
+      "description": "Windows build guide: TDM-GCC/MSYS2, cross-compile from Linux or native Windows build, NSIS installer.",
+      "type": "infra",
+      "priority": "medium",
+      "effort": "small",
+      "status": "done",
+      "dependencies": [],
+      "steps": [
+        "Document TDM-GCC/MSYS2 setup",
+        "Document cross-compile and native build paths",
+        "Document NSIS installer build"
+      ],
+      "acceptance_criteria": [
+        "A new contributor can produce a Windows installer by following the guide"
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": "2026-04-25",
+      "completed_by": "migration",
+      "completion_summary": "Migrated from ROADMAP.md as already-complete.",
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "2.6",
+      "section": "2",
+      "title": "BUILD_GUIDE_MACOS.md",
+      "description": "macOS build guide: Xcode CLT, go test, binary + .app bundle + .dmg.",
+      "type": "infra",
+      "priority": "medium",
+      "effort": "small",
+      "status": "done",
+      "dependencies": [],
+      "steps": [
+        "Document Xcode CLT setup",
+        "Document go test and binary build",
+        "Document .app bundle and .dmg packaging"
+      ],
+      "acceptance_criteria": [
+        "A new contributor can produce .app and .dmg on macOS by following the guide"
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": "2026-04-25",
+      "completed_by": "migration",
+      "completion_summary": "Migrated from ROADMAP.md as already-complete.",
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "3.A",
+      "section": "3",
+      "title": "Cache freshness + standard env-var overrides for Linux trust store",
+      "description": "Two small fixes that together would have surfaced the user's homelab CA today: (1) regenerate local_roots.json when the underlying bundle is newer than the cache, and (2) honor SSL_CERT_FILE / SSL_CERT_DIR env vars (the same overrides Go's crypto/x509 honors) so users who point their toolchain at a custom bundle get consistent behavior in cert_viewer. Today needsRegen() in internal/resources/localroots.go only triggers on legacy-format JSON, and localroots_linux.go hard-codes /etc/ssl/certs/ca-certificates.crt.",
+      "type": "enhancement",
+      "priority": "high",
+      "effort": "small",
+      "status": "done",
+      "dependencies": [],
+      "steps": [
+        "In internal/resources/localroots.go, change needsRegen() to also return true when bundle source mtime is newer than the cache mtime. Pass the source path through from collectRoots() so EnsureLocalRootsJSON can stat it.",
+        "In internal/resources/localroots_linux.go, before falling back to defaultLinuxBundle, check SSL_CERT_FILE; if set and readable, use it as the bundle source. If unset, check SSL_CERT_DIR (colon-separated) and concatenate PEMs from each directory.",
+        "Record the actual resolved source path in localRootsFile.SourcePath so the cache can be invalidated correctly when the env var changes between runs.",
+        "Add table-driven tests in localroots_linux_test.go covering: (a) cache regen when bundle mtime advances, (b) SSL_CERT_FILE override picked up, (c) SSL_CERT_DIR override with multiple .pem files merged, (d) precedence order SSL_CERT_FILE > SSL_CERT_DIR > default.",
+        "Update CLAUDE.md 'Runtime Paths' table to note that SSL_CERT_FILE / SSL_CERT_DIR override the default bundle."
+      ],
+      "acceptance_criteria": [
+        "Touching /etc/ssl/certs/ca-certificates.crt (or running update-ca-certificates) causes the next 'Compare Local vs CCADB' to regenerate the cache without manual deletion.",
+        "Setting SSL_CERT_FILE=/path/to/custom.pem before launch causes that bundle's roots to be used instead of the system default, and certs in it appear in 'Compare Local vs CCADB'.",
+        "Setting SSL_CERT_DIR=/dir1:/dir2 enumerates all *.pem / *.crt files across both directories.",
+        "Existing localroots_linux_test.go and localroots_test.go suites still pass; new tests cover the 4 cases above.",
+        "homelab CA (CN=pki, fingerprint 0B:A6:6E:43:F8:21:A3:AE:AF:9C:21:46:32:F9:98:06:DF:EA:7F:81:28:94:68:6D:8F:C9:4F:6F:EF:2B:58:C4) appears in local_roots.json on this workstation after the fix runs."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": "2026-04-25",
+      "completed_by": "opus-4-7:520c991c",
+      "completion_summary": "Added platform-specific resolveTrustSource()/trustSourceMTime(); Linux honors SSL_CERT_FILE then SSL_CERT_DIR (colon-separated dirs of *.pem/*.crt/*.cer) then defaults to /etc/ssl/certs/ca-certificates.crt; cache regenerates when source identifier changes or source mtime exceeds cache mtime; macOS/Windows return ok=false for mtime (no single stat-able file). Verified locally: homelab-ca now appears in cache (147 roots vs 146 stale).",
+      "branch": "feature/trust-store-cache-and-env-overrides",
+      "commit": "b03ebae",
+      "tests_added": 9
+    },
+    {
+      "id": "3.B",
+      "section": "3",
+      "title": "Trust Sources view: per-distro source dirs + per-user NSS DBs (Linux)",
+      "description": "Move beyond reading a single concatenated bundle to a 'Trust Sources' view that enumerates each origin separately and labels each cert with where it came from. Linux-first scope: detect distro family via /etc/os-release, enumerate the appropriate user-added source directory (e.g. /usr/local/share/ca-certificates/ on Debian, /etc/pki/ca-trust/source/anchors/ on RHEL, /etc/ca-certificates/trust-source/anchors/ on Arch, /etc/pki/trust/anchors/ on SUSE), and read per-user NSS DBs (~/.pki/nssdb, ~/.mozilla/firefox/*/cert9.db). macOS keychain split (System vs login vs SystemRoots) and Windows CurrentUser+GPO are deliberately deferred to follow-up tasks under this section to keep scope tractable.",
+      "type": "feature",
+      "priority": "medium",
+      "effort": "large",
+      "status": "ready",
+      "dependencies": [
+        "3.A"
+      ],
+      "steps": [
+        "Add internal/resources/distro_linux.go that parses /etc/os-release and returns a DistroFamily enum (debian, rhel, arch, suse, alpine, unknown) plus the matching anchor directory path.",
+        "Add internal/resources/anchors_linux.go that enumerates *.crt / *.pem files in the family-appropriate anchor directory and returns []TrustSourceEntry tagged with origin = 'distro-anchor-dir'.",
+        "Add internal/resources/nssdb_linux.go that locates ~/.pki/nssdb and ~/.mozilla/firefox/*/cert9.db and shells out to certutil -L -d sql:<path> if available, returning []TrustSourceEntry tagged with origin = 'nss-user' or 'nss-firefox'. Skip gracefully if certutil is not on PATH.",
+        "Extend LocalRootSummary with an Origin field and an OriginPath field; update writeLocalRoots() to merge entries from the system bundle, env-var overrides, anchor dir, and NSS DBs into one deduplicated list keyed by SHA-256 fingerprint.",
+        "Add a 'Trust Sources' tab in internal/ui/advanced/ (or a new sub-package) that lists each origin with its cert count, expandable to show per-cert subject + SKI + which CCADB bucket (or 'not in CCADB') the cert falls into. Reuse TightTwoColLayout for the per-cert detail rows.",
+        "Add table-driven tests in internal/resources/ for: distro detection from sample os-release fixtures, anchor-dir enumeration with mixed .crt/.pem files, NSS DB parsing with a stubbed certutil. Use t.Setenv to redirect HOME and t.TempDir() for fixtures.",
+        "Document the new Trust Sources tab and per-origin labels in CLAUDE.md and README.md."
+      ],
+      "acceptance_criteria": [
+        "On Debian/Ubuntu, certs from /usr/local/share/ca-certificates/ are listed under origin 'distro-anchor-dir' separately from the bulk of /etc/ssl/certs/ca-certificates.crt.",
+        "On RHEL/Fedora, certs from /etc/pki/ca-trust/source/anchors/ are listed under origin 'distro-anchor-dir'.",
+        "If certutil is installed and ~/.pki/nssdb exists, certs from it appear under origin 'nss-user'. If certutil is missing, the section shows a clear note rather than failing.",
+        "Trust Sources tab shows totals per origin (e.g., 'system bundle: 148, distro-anchor-dir: 2, nss-user: 0, nss-firefox: 1') and lets the user expand each to inspect individual certs.",
+        "Existing 'Compare Local vs CCADB' tab continues to work and now also surfaces the origin label for any cert it shows.",
+        "All new code has unit tests; package coverage in internal/resources/ does not regress."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25"
+    }
+  ]
+}

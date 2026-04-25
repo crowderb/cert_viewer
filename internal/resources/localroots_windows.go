@@ -10,12 +10,25 @@ import (
 	"errors"
 	"fmt"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"golang.org/x/sys/windows"
 )
 
 const windowsRootStoreName = "ROOT"
+
+// resolveTrustSource returns the source identifier recorded in local_roots.json
+// on Windows. Matches the source string set by enumerateSystemRootCertificates
+// so that EnsureLocalRootsJSON's source-changed check is a no-op on this platform.
+func resolveTrustSource() string {
+	return "Windows Certificate Store: " + windowsRootStoreName
+}
+
+// trustSourceMTime is unsupported on Windows — the system certificate store is
+// backed by the registry, not a stat-able file. Returning ok=false skips the
+// mtime-based regen check.
+func trustSourceMTime(string) (time.Time, bool) { return time.Time{}, false }
 
 // enumerateSystemRootCertificates returns parsed certificates from the Windows ROOT store.
 func enumerateSystemRootCertificates(_ context.Context) ([]*x509.Certificate, string, error) {

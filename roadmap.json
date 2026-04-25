@@ -259,7 +259,7 @@
       "type": "feature",
       "priority": "medium",
       "effort": "large",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [
         "3.A"
       ],
@@ -280,11 +280,17 @@
         "Existing 'Compare Local vs CCADB' tab continues to work and now also surfaces the origin label for any cert it shows.",
         "All new code has unit tests; package coverage in internal/resources/ does not regress."
       ],
-      "assigned_agent": "opus-4-7:520c991c",
-      "assigned_at": "2026-04-25T06:11:50Z",
-      "lock_expires": "2026-04-25T08:11:50Z",
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
       "archived": false,
-      "created_at": "2026-04-25"
+      "created_at": "2026-04-25",
+      "completed_at": "2026-04-25",
+      "completed_by": "opus-4-7:520c991c",
+      "completion_summary": "Linux Trust Sources view: per-distro anchor dir enumeration (Debian/RHEL/Arch/SUSE/Alpine via /etc/os-release ID + ID_LIKE), per-user NSS DB reads via certutil shellout (~/.pki/nssdb + Firefox profiles), LocalRootSummary extended with Origins []OriginRef, mergeTrustEntries() dedup by SHA-256, new top-level 'Trust Sources' tab in main.go with per-origin accordions and CCADB membership badges, Compare Local vs CCADB rows now show 'Origins:' line. Resources package coverage 82.8% \u2192 85.8%. Verified locally: homelab CA tagged system-bundle+distro-anchor-dir; mkcert tagged across all four origins. macOS keychain split and Windows CurrentUser/GPO deferred per task description.",
+      "branch": "feature/trust-sources-view",
+      "commit": "d9c7036",
+      "tests_added": 28
     }
   ]
 }

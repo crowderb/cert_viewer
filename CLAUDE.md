@@ -124,6 +124,31 @@ when the source's mtime is newer than the cache's mtime (e.g. an admin ran
 fixed string and the mtime check is skipped, since neither platform exposes a
 single stat-able file for the system trust store.
 
+### Trust Sources & Origin Labels
+
+Each cached root is tagged with one or more `Origins`, recording where the
+cert was observed. The Trust Sources tab (Resources → Trust Sources) groups
+certs by origin and the Compare Local vs CCADB tab surfaces the origin
+labels per cert. Origin constants live in `internal/resources/localroots.go`:
+
+| Constant | Meaning |
+|----------|---------|
+| `OriginSystemBundle` | Default OS bundle (e.g. `/etc/ssl/certs/ca-certificates.crt`, macOS SystemRoots, Windows `ROOT` store) |
+| `OriginEnvOverride` | Bundle resolved from `SSL_CERT_FILE` / `SSL_CERT_DIR` |
+| `OriginDistroAnchorDir` | Admin-installed PEMs in the per-distro anchor directory (Debian: `/usr/local/share/ca-certificates`, RHEL: `/etc/pki/ca-trust/source/anchors`, Arch: `/etc/ca-certificates/trust-source/anchors`, SUSE: `/etc/pki/trust/anchors`) |
+| `OriginNSSUser` | Per-user NSS DB at `~/.pki/nssdb` (read via `certutil` from `libnss3-tools`) |
+| `OriginNSSFirefox` | Each `~/.mozilla/firefox/<profile>/cert9.db` |
+
+A single cert may carry multiple origins — for example, a homelab CA
+installed via `update-ca-certificates` shows both `system-bundle` and
+`distro-anchor-dir`. NSS sources are read on Linux only and require the
+`certutil` CLI; the Trust Sources tab shows a clear note instead of an
+error when the tool is missing or a profile DB is absent.
+
+Distro detection uses `/etc/os-release` (`ID`, then `ID_LIKE`) so derived
+distros (Mint, Manjaro, Rocky, Alma, Amazon Linux, Pop, etc.) inherit
+their parent family's anchor directory automatically.
+
 ---
 
 ## Code Conventions Used in This Project

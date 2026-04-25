@@ -10,9 +10,22 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os/exec"
+	"time"
 )
 
 const macOSSystemRootKeychain = "/System/Library/Keychains/SystemRootCertificates.keychain"
+
+// resolveTrustSource returns the source identifier recorded in local_roots.json
+// on macOS. Mirrors the source string set by enumerateSystemRootCertificates so
+// that EnsureLocalRootsJSON's source-changed check is a no-op on this platform.
+func resolveTrustSource() string {
+	return "macOS Keychain: " + macOSSystemRootKeychain
+}
+
+// trustSourceMTime is unsupported on macOS — the keychain is not a single file
+// with a meaningful mtime. Returning ok=false skips the mtime-based regen check
+// and preserves the platform's existing legacy/format-only freshness logic.
+func trustSourceMTime(string) (time.Time, bool) { return time.Time{}, false }
 
 // enumerateSystemRootCertificates loads PEM-encoded roots from the macOS system root keychain.
 func enumerateSystemRootCertificates(ctx context.Context) ([]*x509.Certificate, string, error) {

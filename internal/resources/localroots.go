@@ -46,13 +46,21 @@ func LocalRootsPath() (string, error) {
 // EnsureLocalRootsJSON generates local_roots.json if it does not exist or needs
 // regeneration. Platform-specific certificate collection is handled by collectRoots(),
 // defined in localroots_linux.go / localroots_windows.go / localroots_unsupported.go.
+//
+// The cache is regenerated when any of the following are true:
+//   - the file does not exist
+//   - the file is legacy-format or malformed (needsRegen)
+//   - the resolved trust-store source has changed since the cache was written
+//     (e.g. SSL_CERT_FILE was set or unset between runs)
+//   - the trust-store source's mtime is newer than the cache's mtime
+//     (e.g. update-ca-certificates ran since the last cache write)
 func EnsureLocalRootsJSON(ctx context.Context) error {
 	path, err := LocalRootsPath()
 	if err != nil {
 		return err
 	}
-	if _, err := os.Stat(path); err == nil {
-		if !needsRegen(path) {
+	if info, err := os.Stat(path); err == nil {
+		if !needsRegen(path) && !sourceChangedOrFresher(path, info.ModTime()) {
 			return nil
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -67,6 +75,29 @@ func EnsureLocalRootsJSON(ctx context.Context) error {
 		SourcePath:  source,
 		Roots:       roots,
 	})
+}
+
+// sourceChangedOrFresher reports whether the cache at cachePath is stale because
+// either the trust-store source identifier recorded in the cache no longer matches
+// the currently-resolved source, or that source's content mtime is newer than the
+// cache's mtime. Returns true on any read/parse error to force regeneration.
+func sourceChangedOrFresher(cachePath string, cacheMTime time.Time) bool {
+	b, err := os.ReadFile(cachePath)
+	if err != nil {
+		return true
+	}
+	var f localRootsFile
+	if err := json.Unmarshal(b, &f); err != nil {
+		return true
+	}
+	current := resolveTrustSource()
+	if current != "" && f.SourcePath != "" && current != f.SourcePath {
+		return true
+	}
+	if mt, ok := trustSourceMTime(current); ok && mt.After(cacheMTime) {
+		return true
+	}
+	return false
 }
 
 func writeLocalRoots(path string, content localRootsFile) error {

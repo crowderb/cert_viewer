@@ -520,7 +520,7 @@
       "type": "enhancement",
       "priority": "low",
       "effort": "small",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [
         "4.D"
       ],
@@ -535,16 +535,16 @@
         "main.go configures a `slog` default handler before any package-init logging could fire.",
         "CLAUDE.md documents slog as the project logging standard."
       ],
-      "assigned_agent": "opus-4:50f32f66",
-      "assigned_at": "2026-04-26T04:38:43Z",
-      "lock_expires": "2026-04-26T06:38:43Z",
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
       "archived": false,
       "created_at": "2026-04-25",
-      "completed_at": null,
-      "completed_by": null,
-      "completion_summary": null,
-      "branch": null,
-      "commit": null,
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Adopted log/slog. configureLogger() runs first thing in main(); honors CERT_VIEWER_LOG=debug. Replaced 9 silently-swallowed errors with slog.Warn (factored prefs.Save and EnsureLocalRootsJSON sites in main.go through small helper closures). Added slog.Warn at best-effort cleanup sites in prefs.Load (MkdirAll), fetcher.go (stale cache remove, prefs save, tmp cleanup), and dialogs.go (Preferences Apply). CLAUDE.md Code Conventions documents the standard.",
+      "branch": "feature/slog-adoption-linux-logfile",
+      "commit": "e2c5744",
       "tests_added": 0
     },
     {
@@ -555,7 +555,7 @@
       "type": "enhancement",
       "priority": "medium",
       "effort": "small",
-      "status": "backlog",
+      "status": "done",
       "dependencies": [
         "4.G"
       ],
@@ -579,7 +579,13 @@
       "assigned_at": null,
       "lock_expires": null,
       "archived": false,
-      "created_at": "2026-04-26"
+      "created_at": "2026-04-26",
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Added cmd/cert_viewer/logging.go with teeHandler (fans Records to multiple slog.Handlers), startup-time size-based rotation (>5 MiB \u2192 .log.1, single slot), and Linux log file at $XDG_STATE_HOME/cert_viewer/cert_viewer.log via prefs.LogDir(). macOS and Windows fall back to UserCacheDir-based paths until 4.I and 4.J. Logging-setup failures degrade to stderr-only \u2014 never block app launch. 7 new tests under t.TempDir() cover LogDir resolution, all rotation paths, tee fan-out, per-child level filtering, and joined error semantics.",
+      "branch": "feature/slog-adoption-linux-logfile",
+      "commit": "a110480",
+      "tests_added": 7
     },
     {
       "id": "4.I",
@@ -589,7 +595,7 @@
       "type": "enhancement",
       "priority": "medium",
       "effort": "small",
-      "status": "backlog",
+      "status": "ready",
       "dependencies": [
         "4.H"
       ],
@@ -618,7 +624,7 @@
       "type": "enhancement",
       "priority": "medium",
       "effort": "small",
-      "status": "backlog",
+      "status": "ready",
       "dependencies": [
         "4.H"
       ],

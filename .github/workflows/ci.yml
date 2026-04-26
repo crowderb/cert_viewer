@@ -27,7 +27,10 @@ jobs:
       # is the source of truth. Keeping `go test` and `go build` here so test
       # failures and build failures stay distinct from lint failures.
       - name: Test
-        run: go test ./...
+        # `-race` catches data races at test time (vastly cheaper than in
+        # production); `-count=1` defeats the test cache, which interacts
+        # poorly with -race in CI.
+        run: go test -race -count=1 ./...
 
       - name: Build
         run: go build ./cmd/cert_viewer

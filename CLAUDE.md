@@ -230,6 +230,12 @@ Priority order for new tests:
 4. `cmd/cert_viewer/` — integration tests are last; UI testing with Fyne requires
    `fyne.io/fyne/v2/test` package
 
+**Race detection:** Run `go test -race -count=1 ./...` before merging significant
+changes. CI runs the same invocation as a blocking job; `-race` catches data
+races at test time, `-count=1` defeats the test cache (which interacts poorly
+with `-race` in CI). Plain `go test ./...` is fine for the inner edit-loop, but
+the `-race` run is the merge gate.
+
 ---
 
 ## Git Workflow

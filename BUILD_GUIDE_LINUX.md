@@ -136,11 +136,32 @@ ok  	cert_viewer/internal/ui/summary
 
 ## 6. Build the Binary
 
+For a quick development build, this single line works:
+
 ```bash
 CGO_ENABLED=1 go build -ldflags="-s -w" -o cert_viewer ./cmd/cert_viewer
 ```
 
 The `-s -w` flags strip debug symbols and DWARF data, reducing binary size.
+
+To reproduce a CI-grade build that injects the version, commit, and build
+timestamp into the binary's `internal/version` package (the values shown
+in Help → About), pass extra `-X` flags:
+
+```bash
+VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
+COMMIT="$(git rev-parse --short HEAD)"
+BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+CGO_ENABLED=1 go build -ldflags="-s -w \
+  -X cert_viewer/internal/version.Version=$VERSION \
+  -X cert_viewer/internal/version.Commit=$COMMIT \
+  -X cert_viewer/internal/version.BuildDate=$BUILD_DATE" \
+  -o cert_viewer ./cmd/cert_viewer
+```
+
+Without the `-X` flags the binary reports `Version=dev`, `Commit=unknown`,
+`BuildDate=<unset>` — useful for spotting non-release builds in bug reports.
 
 Run directly:
 

@@ -59,3 +59,28 @@ jobs:
           # CLAUDE.md; bump in lockstep when upgrading.
           version: v1.64.8
           args: --timeout=5m
+
+  vuln:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # govulncheck only flags vulnerabilities in code paths the project
+      # actually reaches, so signal stays high. Pinned version keeps results
+      # reproducible; bump in lockstep with CLAUDE.md when upgrading.
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
+
+      # continue-on-error is a deliberate exception, not a permanent state.
+      # Today's baseline lists Go stdlib CVEs (resolved by bumping the Go
+      # toolchain — tracked as roadmap task 4.D) and one indirect dependency
+      # (golang.org/x/image, transitively pulled by Fyne). Once 4.D ships,
+      # remove `continue-on-error` so this job blocks merges.
+      - name: govulncheck
+        continue-on-error: true
+        run: govulncheck ./...

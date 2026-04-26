@@ -21,30 +21,30 @@ func MapOIDToName(oid asn1.ObjectIdentifier, windowsStyle bool) string {
 	// Common OIDs for Subject/Issuer attributes
 	oidStr := OIDToString(oid)
 	var openssl = map[string]string{
-		"2.5.4.3":  "CN",
-		"2.5.4.6":  "C",
-		"2.5.4.7":  "L",
-		"2.5.4.8":  "ST",
-		"2.5.4.10": "O",
-		"2.5.4.11": "OU",
-		"1.2.840.113549.1.9.1": "emailAddress",
-		"2.5.4.9":  "street",
-		"2.5.4.17": "postalCode",
+		"2.5.4.3":                    "CN",
+		"2.5.4.6":                    "C",
+		"2.5.4.7":                    "L",
+		"2.5.4.8":                    "ST",
+		"2.5.4.10":                   "O",
+		"2.5.4.11":                   "OU",
+		"1.2.840.113549.1.9.1":       "emailAddress",
+		"2.5.4.9":                    "street",
+		"2.5.4.17":                   "postalCode",
 		"0.9.2342.19200300.100.1.25": "DC",
-		"2.5.4.5":  "serialNumber",
+		"2.5.4.5":                    "serialNumber",
 	}
 	var windows = map[string]string{
-		"2.5.4.3":  "Common Name",
-		"2.5.4.6":  "Country",
-		"2.5.4.7":  "Locality",
-		"2.5.4.8":  "State/Province",
-		"2.5.4.10": "Organization",
-		"2.5.4.11": "Organizational Unit",
-		"1.2.840.113549.1.9.1": "E-Mail",
-		"2.5.4.9":  "Street",
-		"2.5.4.17": "Postal Code",
+		"2.5.4.3":                    "Common Name",
+		"2.5.4.6":                    "Country",
+		"2.5.4.7":                    "Locality",
+		"2.5.4.8":                    "State/Province",
+		"2.5.4.10":                   "Organization",
+		"2.5.4.11":                   "Organizational Unit",
+		"1.2.840.113549.1.9.1":       "E-Mail",
+		"2.5.4.9":                    "Street",
+		"2.5.4.17":                   "Postal Code",
 		"0.9.2342.19200300.100.1.25": "Domain Component",
-		"2.5.4.5":  "Serial Number",
+		"2.5.4.5":                    "Serial Number",
 	}
 	if windowsStyle {
 		if v, ok := windows[oidStr]; ok {
@@ -209,5 +209,5 @@ func FormatSerialWithSep(n *big.Int, sep string) string {
 }
 
 func NormalizeHexBytesNoSepUpper(b []byte) string {
-    return BytesToHexNoSepUpper(b)
+	return BytesToHexNoSepUpper(b)
 }

@@ -4,10 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"net/http"
-	"strings"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -87,9 +87,9 @@ func Build(root *fyne.Container, p prefs.Preferences) {
 			}
 			seen[o.Type] = struct{}{}
 			byOrigin[o.Type] = append(byOrigin[o.Type], certEntry{
-				summary:  r,
-				path:     o.Path,
-				inCCADB:  isInCCADB(r.SubjectKeyIdentifier, ccadb),
+				summary: r,
+				path:    o.Path,
+				inCCADB: isInCCADB(r.SubjectKeyIdentifier, ccadb),
 			})
 		}
 	}

@@ -14,11 +14,11 @@ import (
 
 func TestDetectDistroFamily(t *testing.T) {
 	tests := []struct {
-		name        string
-		osRelease   string
-		wantFamily  DistroFamily
-		wantAnchor  string
-		wantPretty  string
+		name       string
+		osRelease  string
+		wantFamily DistroFamily
+		wantAnchor string
+		wantPretty string
 	}{
 		{
 			name: "ubuntu",

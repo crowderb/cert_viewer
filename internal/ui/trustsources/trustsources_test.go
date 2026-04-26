@@ -11,8 +11,8 @@ import (
 func TestOrderedOrigins(t *testing.T) {
 	t.Run("known origins emerge in display order", func(t *testing.T) {
 		m := map[string][]certEntry{
-			resources.OriginNSSUser:        nil,
-			resources.OriginSystemBundle:   nil,
+			resources.OriginNSSUser:         nil,
+			resources.OriginSystemBundle:    nil,
 			resources.OriginDistroAnchorDir: nil,
 		}
 		got := orderedOrigins(m)

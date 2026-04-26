@@ -11,7 +11,7 @@ import (
 // If an odd object remains it will be placed in the left column on its own row.
 //
 // This keeps rows compact and gives more width to the value column.
- type TightTwoColLayout struct{}
+type TightTwoColLayout struct{}
 
 func NewTightTwoColLayout() *TightTwoColLayout { return &TightTwoColLayout{} }
 

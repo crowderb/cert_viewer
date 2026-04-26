@@ -29,7 +29,12 @@ git --version
 
 ---
 
-## 2. Install Go (1.24 or later)
+## 2. Install Go (1.25.9 or later)
+
+The project pins the Go toolchain in `go.mod` (`toolchain go1.25.9`).
+Contributors should install at least Go 1.25.0 — the toolchain directive
+will fetch `go1.25.9` automatically on first build if a newer version is
+installed locally; on older versions the `go` command refuses to build.
 
 Check whether Go is already installed:
 
@@ -42,7 +47,7 @@ https://go.dev/dl/ and run it. The installer adds `/usr/local/go/bin` to your `P
 
 Verify after installation:
 ```bash
-go version   # should print: go version go1.24.x darwin/arm64 (or amd64)
+go version   # should print: go version go1.25.x darwin/arm64 (or amd64)
 ```
 
 ---

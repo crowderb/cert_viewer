@@ -343,7 +343,7 @@
       "type": "infra",
       "priority": "high",
       "effort": "small",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [
         "4.A"
       ],
@@ -358,16 +358,16 @@
         "No new ad-hoc //go:build !race exclusions are introduced unless individually justified in a comment.",
         "CLAUDE.md documents -race as the standard local test invocation."
       ],
-      "assigned_agent": "opus-4:50f32f66",
-      "assigned_at": "2026-04-26T02:48:56Z",
-      "lock_expires": "2026-04-26T04:48:56Z",
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
       "archived": false,
       "created_at": "2026-04-25",
-      "completed_at": null,
-      "completed_by": null,
-      "completion_summary": null,
-      "branch": null,
-      "commit": null,
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Enabled -race -count=1 in CI test step. Local run was clean \u2014 no data races to fix. CLAUDE.md Testing Strategy now documents -race as the merge-gate invocation.",
+      "branch": "feature/http-timeouts-and-race",
+      "commit": "ed42b85",
       "tests_added": 0
     },
     {
@@ -378,7 +378,7 @@
       "type": "enhancement",
       "priority": "high",
       "effort": "small",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [],
       "steps": [
         "Add a small internal/httpclient package (or a package-private `httpClient = &http.Client{Timeout: 30 * time.Second}` in each of internal/certs and internal/resources \u2014 pick whichever the deep-module-architect agent recommends; a shared internal package is preferred so timeouts can be tuned in one place).",
@@ -393,17 +393,17 @@
         "New httptest-backed timeout test passes and demonstrates a 30s timeout actually fires.",
         "CLAUDE.md documents the convention and the rationale."
       ],
-      "assigned_agent": "opus-4:50f32f66",
-      "assigned_at": "2026-04-26T02:49:02Z",
-      "lock_expires": "2026-04-26T04:49:02Z",
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
       "archived": false,
       "created_at": "2026-04-25",
-      "completed_at": null,
-      "completed_by": null,
-      "completion_summary": null,
-      "branch": null,
-      "commit": null,
-      "tests_added": 0
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Added internal/httpclient package with Default() (30s) and CCADBDownload() (120s) shared clients. Replaced all 6 http.DefaultClient.Do call sites in internal/ (certs/crl_fetch.go, certs/ocsp_check.go x2, resources/fetcher.go x2, ui/chain/chain.go). Added httptest hung-server timeout test that exercises the actual client.Timeout behavior plus singleton-identity and configured-value tests. CLAUDE.md updated to ban http.DefaultClient with rationale.",
+      "branch": "feature/http-timeouts-and-race",
+      "commit": "4eba603",
+      "tests_added": 3
     },
     {
       "id": "4.D",

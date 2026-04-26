@@ -413,7 +413,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "ready",
+      "status": "in_progress",
       "dependencies": [],
       "steps": [
         "Add `toolchain go1.24.0` line to go.mod immediately after the `go 1.24.0` line.",
@@ -428,9 +428,9 @@
         "CLAUDE.md and BUILD_GUIDE_*.md reference the pinned toolchain.",
         "CI's `actions/setup-go@v5 with: go-version-file: go.mod` continues to work (the action honors the toolchain directive)."
       ],
-      "assigned_agent": null,
-      "assigned_at": null,
-      "lock_expires": null,
+      "assigned_agent": "opus-4:50f32f66",
+      "assigned_at": "2026-04-26T03:37:05Z",
+      "lock_expires": "2026-04-26T05:37:05Z",
       "archived": false,
       "created_at": "2026-04-25",
       "completed_at": null,

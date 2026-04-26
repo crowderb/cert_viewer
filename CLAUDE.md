@@ -227,6 +227,14 @@ their parent family's anchor directory automatically.
   `_ = err`, log at `slog.Warn`. For unexpected failures, `slog.Error`. Keep
   log records free of certificate or PKCS#12 contents — paths and error
   strings only.
+- **Update check (opt-in only):** `internal/updates` queries the GitHub tags
+  API to discover the latest CalVer release. The check fires *only* when the
+  user clicks "Check for Updates" in the About dialog. There is no
+  startup-time check, no background polling, and no telemetry — this is a
+  deliberate privacy stance for users on air-gapped or metered networks. If
+  you add a new caller of `updates.CheckLatestTag`, it must remain
+  user-initiated; do not wire it into a timer, startup hook, or autoload
+  path without an explicit consent dialog first.
 - **Naming style:** Standard Go conventions; exported types/functions for anything used
   across packages; unexported for package-internal helpers
 

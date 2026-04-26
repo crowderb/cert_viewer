@@ -40,6 +40,13 @@
       "description": "Bring the project into alignment with the updated ~/.claude/languages/go.md standards: blocking lint, race detection, vulnerability scanning, HTTP timeouts, reproducible toolchain pinning, and pre-commit hooks. Each task is sized to a single reviewable PR and includes its own documentation updates so CLAUDE.md, README.md, and BUILD_GUIDE_*.md never drift behind the code.",
       "docs": [],
       "prerequisites": []
+    },
+    {
+      "id": "5",
+      "title": "Versioning, Identity & Updates",
+      "description": "App identity surface (About menu), CalVer-based versioning (YYYY.MM.DD.N), and an opt-in update check against the GitHub tags API.",
+      "docs": [],
+      "prerequisites": []
     }
   ],
   "tasks": [
@@ -640,6 +647,130 @@
         "Rotation behavior matches 4.H.",
         "Logger does not crash or panic when stderr is unavailable (windowsgui).",
         "Documented in CLAUDE.md Runtime Paths."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-26"
+    },
+    {
+      "id": "5.A",
+      "section": "5",
+      "title": "internal/version package + -ldflags injection",
+      "description": "Establish the in-binary version string. internal/version/version.go declares package-level vars Version, Commit, BuildDate, each defaulting to a development sentinel ('dev', 'unknown', '<unset>'). Build pipelines inject real values via -ldflags. Source code never mutates as part of a release.",
+      "type": "infra",
+      "priority": "medium",
+      "effort": "small",
+      "status": "ready",
+      "dependencies": [],
+      "steps": [
+        "Create internal/version/version.go with package-level vars Version, Commit, BuildDate (default sentinels for non-CI builds).",
+        "Wire -ldflags into the release workflows in .github/workflows/ \u2014 every `go build` step that produces a distributable artifact must pass: -X cert_viewer/internal/version.Version=$VERSION -X cert_viewer/internal/version.Commit=$(git rev-parse --short HEAD) -X cert_viewer/internal/version.BuildDate=$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+        "Update BUILD_GUIDE_LINUX.md, BUILD_GUIDE_MACOS.md, BUILD_GUIDE_WINDOWS.md with the same ldflags incantation so contributors can reproduce CI builds locally.",
+        "Add a small test that asserts internal/version exposes the expected exported names with non-panicking string types."
+      ],
+      "acceptance_criteria": [
+        "Built binaries with no -ldflags show the dev sentinel.",
+        "go build with the -ldflags command set shows the injected values.",
+        "Release workflows for Linux/macOS/Windows all pass the ldflags.",
+        "BUILD_GUIDE_*.md document the ldflags command."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-26"
+    },
+    {
+      "id": "5.B",
+      "section": "5",
+      "title": "Auto-tag merges to main with CalVer YYYY.MM.DD.N",
+      "description": "GitHub Actions workflow on push to main computes the next YYYY.MM.DD.N tag and pushes it. First merge any UTC day = .1; subsequent merges that day increment N. Tags trigger the existing release workflow (which builds with the ldflags from 5.A so artifacts carry the correct version).",
+      "type": "infra",
+      "priority": "medium",
+      "effort": "small",
+      "status": "backlog",
+      "dependencies": [
+        "5.A"
+      ],
+      "steps": [
+        "Add .github/workflows/auto-tag.yml triggered on push to main (skip on tag pushes to avoid recursion).",
+        "Workflow logic: fetch all tags, take today's date in UTC, list tags matching YYYY.MM.DD.*, compute max N, set new tag = YYYY.MM.DD.(N+1) (or YYYY.MM.DD.1 if none).",
+        "Create annotated tag with the merge commit's subject as the message; push to origin using GITHUB_TOKEN with permissions: contents: write.",
+        "Confirm that pushed tags trigger the existing release workflow (tag-on-tag does not retrigger this auto-tag workflow because it filters on push:main only).",
+        "Add a guard step that exits cleanly if the workflow attempts to tag a commit that already has a YYYY.MM.DD.N tag (concurrent runs).",
+        "Document the tagging contract in CLAUDE.md so contributors know merging = tagging."
+      ],
+      "acceptance_criteria": [
+        "First merge to main on a UTC day creates tag YYYY.MM.DD.1.",
+        "Subsequent merges the same day produce .2, .3, etc., based on the existing tag count.",
+        "Tags are annotated and visible via `git tag -l`.",
+        "Workflow exits cleanly without double-tagging when run twice on the same commit.",
+        "Tag push triggers the downstream release workflow."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-26"
+    },
+    {
+      "id": "5.C",
+      "section": "5",
+      "title": "Help \u2192 About menu with version, repo link, install guides",
+      "description": "Add a top-level Help menu (or extend an existing one) with About, GitHub Repository, and Install Guides items. About dialog shows Version, Commit, BuildDate from internal/version plus clickable links to the GitHub repo and the three BUILD_GUIDE_*.md pages on github.com. UI is a thin wrapper around internal/version \u2014 never inlines version strings.",
+      "type": "feature",
+      "priority": "medium",
+      "effort": "small",
+      "status": "backlog",
+      "dependencies": [
+        "5.A"
+      ],
+      "steps": [
+        "Add internal/ui/dialogs/about.go with ShowAbout(win) building a fyne dialog: Version / Commit / BuildDate rows from internal/version, clickable hyperlinks to https://github.com/crowderb/cert_viewer and the three install guides under that repo's blob/main/.",
+        "Wire the Help \u2192 About menu item in cmd/cert_viewer/main.go's main menu construction. Group it with sibling items 'GitHub Repository' (opens the repo URL) and 'Install Guides' submenu (Linux / macOS / Windows links).",
+        "Use Fyne's existing url-opening helper (or fyne.CurrentApp().OpenURL with a parsed url.URL) so links open in the OS default browser. Cover the parse error path with a slog.Warn.",
+        "Smoke-test by running the app, opening Help \u2192 About, clicking each link."
+      ],
+      "acceptance_criteria": [
+        "Help \u2192 About displays the current version (matching the binary's compiled-in value).",
+        "GitHub Repository link opens the repo in the system default browser.",
+        "Each install-guide link opens the corresponding BUILD_GUIDE_*.md on github.com.",
+        "Dialog dismisses cleanly with Esc and the Close button."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-26"
+    },
+    {
+      "id": "5.D",
+      "section": "5",
+      "title": "Manual 'Check for Updates' against GitHub tags API",
+      "description": "About dialog gains a 'Check for Updates' button that queries https://api.github.com/repos/crowderb/cert_viewer/tags, finds the highest YYYY.MM.DD.N tag, and compares it to the running binary's version. Strictly opt-in: never runs at startup, only when the button is clicked. Respects users on air-gapped networks and avoids the privacy footprint of background telemetry.",
+      "type": "feature",
+      "priority": "medium",
+      "effort": "small",
+      "status": "backlog",
+      "dependencies": [
+        "5.A",
+        "5.C"
+      ],
+      "steps": [
+        "Add internal/updates package: ParseCalVer(s string) (year, month, day, n int, ok bool); CompareCalVer(a, b string) int; CheckLatestTag(ctx context.Context) (latest string, isNewer bool, err error). CheckLatestTag uses httpclient.Default().Do() (timeouts already set) against api.github.com/repos/crowderb/cert_viewer/tags.",
+        "Filter the tags list to only those matching YYYY.MM.DD.N. Ignore non-conforming tags. Return the highest by parsed components.",
+        "About dialog: 'Check for Updates' button. On click, run CheckLatestTag in a goroutine with a 10s context; render the result inline below the button: 'Up to date.' or 'Update available: YYYY.MM.DD.N \u2014 <repo URL>/releases'. Errors render as 'Update check failed: <reason>' (no panic).",
+        "Tests: parse-and-compare logic for newer/older/equal/malformed inputs. httptest-backed CheckLatestTag exercising both 200 and 5xx responses. Cover the 'no tags match the format' edge case.",
+        "Document in CLAUDE.md that the update check is opt-in and explain the privacy stance \u2014 no background polling, no telemetry, click-to-check only."
+      ],
+      "acceptance_criteria": [
+        "'Check for Updates' button issues exactly one HTTP request per click and never runs at startup.",
+        "Result is rendered in the dialog without blocking the UI thread.",
+        "Network failures and malformed responses produce a clear error message, not a panic or silent freeze.",
+        "Tests cover newer / older / equal / malformed-tag cases plus 200 and 5xx HTTP paths.",
+        "CLAUDE.md documents the opt-in posture."
       ],
       "assigned_agent": null,
       "assigned_at": null,

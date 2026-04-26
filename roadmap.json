@@ -307,7 +307,7 @@
       "type": "infra",
       "priority": "high",
       "effort": "medium",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [],
       "steps": [
         "Add .golangci.yml at repo root enabling at minimum: errcheck, govet, staticcheck, gosec, revive, gocritic, bodyclose, errorlint, contextcheck, noctx, nilerr. Set `run.timeout: 5m` and `issues.exclude-use-default: false`. Pin a specific golangci-lint version (e.g. v1.62.x) for reproducibility.",
@@ -323,16 +323,16 @@
         "CLAUDE.md and the three BUILD_GUIDE_*.md files reference `golangci-lint run` as part of the standard local workflow.",
         "Existing `go vet` step in ci.yml is removed (subsumed by golangci-lint's govet linter) or kept with a comment explaining why."
       ],
-      "assigned_agent": "opus-4-7:0f3afb9c",
-      "assigned_at": "2026-04-26T02:31:01Z",
-      "lock_expires": "2026-04-26T04:31:01Z",
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
       "archived": false,
       "created_at": "2026-04-25",
-      "completed_at": null,
-      "completed_by": null,
-      "completion_summary": null,
-      "branch": null,
-      "commit": null,
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4-7:0f3afb9c",
+      "completion_summary": "Added .golangci.yml with required linter set (errcheck, staticcheck, gosec, revive, gocritic, bodyclose, errorlint, contextcheck, noctx, nilerr, plus ineffassign/unused/misspell). Wired blocking lint job to ci.yml (golangci-lint-action@v6, pinned v1.62.2). Fixed 5 real bugs surfaced: deferred conn.Close error, oidExtensionAuthorityKeyId naming, deprecated container.NewMax, dead runtime.GOOS check in linux-only file, context propagation through chain.BuildFromCerts. Documented gosec/gocritic categorical suppressions at rule level. Deferred revive doc-comment rules (~30 additions) to a separate cleanup task per CLAUDE.md tech debt entry. Updated CLAUDE.md and all three BUILD_GUIDE_*.md files with the new lint workflow.",
+      "branch": "feature/golangci-lint-ci",
+      "commit": "d349563",
       "tests_added": 0
     },
     {
@@ -343,7 +343,7 @@
       "type": "infra",
       "priority": "high",
       "effort": "small",
-      "status": "backlog",
+      "status": "ready",
       "dependencies": [
         "4.A"
       ],
@@ -448,7 +448,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "backlog",
+      "status": "ready",
       "dependencies": [
         "4.A"
       ],
@@ -483,7 +483,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "backlog",
+      "status": "ready",
       "dependencies": [
         "4.A"
       ],

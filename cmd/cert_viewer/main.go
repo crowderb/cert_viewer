@@ -34,21 +34,6 @@ import (
 	"cert_viewer/internal/ui/trustsources"
 )
 
-// configureLogger installs a slog default handler before any other code can
-// emit a record. CERT_VIEWER_LOG=debug raises the level; the default is INFO
-// (warnings and errors are always shown). 4.H replaces this with a tee that
-// also writes to a per-OS log file; until then the only sink is stderr,
-// which is fine for terminal-launched runs and silently dropped under
-// `windowsgui` builds.
-func configureLogger() {
-	level := slog.LevelInfo
-	if v := strings.ToLower(os.Getenv("CERT_VIEWER_LOG")); v == "debug" {
-		level = slog.LevelDebug
-	}
-	handler := slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})
-	slog.SetDefault(slog.New(handler))
-}
-
 func main() {
 	configureLogger()
 

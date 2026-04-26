@@ -124,6 +124,24 @@ internal/
 | Preferences | `~/.config/cert_viewer/preferences.json` |
 | CCADB CSV cache | `~/.cache/cert_viewer/ccadb_all_certificate_records_v2.csv` |
 | Local roots cache | `~/.cache/cert_viewer/local_roots.json` |
+| Log file (Linux) | `$XDG_STATE_HOME/cert_viewer/cert_viewer.log` (default `~/.local/state/cert_viewer/cert_viewer.log`) |
+| Log file (macOS, fallback) | `~/Library/Caches/cert_viewer/logs/cert_viewer.log` — replaced with `~/Library/Logs/cert_viewer/` once 4.I lands |
+| Log file (Windows, fallback) | `%LOCALAPPDATA%\cert_viewer\cache\logs\cert_viewer.log` — replaced with `%LOCALAPPDATA%\cert_viewer\Logs\` once 4.J lands |
+
+### Logging
+
+`cmd/cert_viewer/logging.go` configures `slog.Default()` early in `main()`. Records
+fan out through a `teeHandler` to two sinks:
+
+1. **stderr** — visible to terminal-launched runs and dropped under
+   `windowsgui` builds (Windows GUI binaries have no console).
+2. **A per-OS log file** opened with mode `0o600`. The file is rotated
+   to `cert_viewer.log.1` at startup if it exceeds 5 MiB; only one
+   rotated slot is retained (next rotation overwrites it).
+
+Set `CERT_VIEWER_LOG=debug` to lower the level to DEBUG; default is INFO.
+Logging-setup failures fall back to stderr-only — they never block the
+app from launching.
 
 ### Trust-Store Source Resolution (Linux)
 

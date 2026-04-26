@@ -39,9 +39,9 @@ func TestDefault(t *testing.T) {
 
 func TestCacheFilenameFromURL(t *testing.T) {
 	tests := []struct {
-		name  string
-		url   string
-		want  string
+		name string
+		url  string
+		want string
 	}{
 		{"v2 URL", "https://ccadb.my.salesforce-sites.com/ccadb/AllCertificateRecordsCSVFormatv2", "allcertificaterecordscsvformatv2.csv"},
 		{"v3 URL", "https://ccadb.my.salesforce-sites.com/ccadb/AllCertificateRecordsCSVFormatv3", "allcertificaterecordscsvformatv3.csv"},

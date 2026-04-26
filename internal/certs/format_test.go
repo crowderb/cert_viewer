@@ -267,10 +267,10 @@ func TestFormatHex(t *testing.T) {
 
 func TestFormatSerialWithSep(t *testing.T) {
 	tests := []struct {
-		name  string
-		n     *big.Int
-		sep   string
-		want  string
+		name string
+		n    *big.Int
+		sep  string
+		want string
 	}{
 		{"nil", nil, ":", ""},
 		{"zero no sep", big.NewInt(0), "", "00"},

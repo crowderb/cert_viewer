@@ -40,6 +40,15 @@ go test ./...
 # Run lint (matches CI; pin matches .golangci.yml + ci.yml)
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 golangci-lint run ./...
+
+# Vulnerability scan (matches CI vuln job; currently advisory — see Known
+# Technical Debt for the 4.D toolchain bump that flips it to blocking)
+go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
+govulncheck ./...
+
+# One-time: install pre-commit hooks (gofmt, goimports, golangci-lint)
+pip install --user pre-commit   # or: pipx install pre-commit
+pre-commit install
 ```
 
 ---
@@ -167,6 +176,11 @@ their parent family's anchor directory automatically.
   `bodyclose`, `errorlint`, `contextcheck`, `noctx`, `nilerr`, plus extras).
   When upgrading the pinned version, update both the GitHub Action and this
   doc together.
+- **Vulnerability scanning:** CI runs `govulncheck ./...` as a separate `vuln`
+  job, currently `continue-on-error` until roadmap 4.D bumps the pinned Go
+  toolchain (see Known Technical Debt). Run `govulncheck ./...` locally as
+  part of the standard pre-PR workflow alongside `golangci-lint run ./...`
+  and `go test -race -count=1 ./...`.
 - **Hex normalization:** All SKIs are normalized to uppercase hex with no separator
   for internal comparisons (`NormalizeHexBytesNoSepUpper` in `format.go`)
 - **Goroutines for I/O:** Background operations (CCADB fetch, local roots generation)
@@ -219,6 +233,15 @@ silently — reference this list and address them as part of related work.
 
 7. **No PKCS#7 support** — AIA CA Issuers URLs sometimes return PKCS#7 bundles.
    `tryParseSingleCert()` will fail for these. Tracked in roadmap.
+
+8. **`govulncheck` job is non-blocking until 4.D lands** — the baseline scan
+   reports reachable CVEs in Go stdlib packages (`crypto/x509`, `crypto/tls`,
+   `net/url`, `os`, `encoding/pem`) plus one indirect dependency
+   (`golang.org/x/image@v0.18.0`, pulled in transitively by Fyne). All Go
+   stdlib findings are fixed in current 1.25.x patch releases; resolution is
+   tracked in roadmap task 4.D (Pin Go toolchain via `go.mod` toolchain
+   directive). When 4.D ships, remove `continue-on-error: true` from the
+   `vuln` job in `.github/workflows/ci.yml`.
 
 ---
 

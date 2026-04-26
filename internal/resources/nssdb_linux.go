@@ -22,10 +22,10 @@ import (
 type NSSStatus int
 
 const (
-	NSSAvailable     NSSStatus = iota // Successfully read certutil output
-	NSSNotInstalled                   // certutil binary not on PATH
-	NSSDBMissing                      // Database directory or file does not exist
-	NSSReadError                      // certutil ran but returned an error
+	NSSAvailable    NSSStatus = iota // Successfully read certutil output
+	NSSNotInstalled                  // certutil binary not on PATH
+	NSSDBMissing                     // Database directory or file does not exist
+	NSSReadError                     // certutil ran but returned an error
 )
 
 // NSSResult bundles the entries pulled from a single NSS database with a
@@ -33,10 +33,10 @@ const (
 // The UI uses Status to decide between rendering the entry list, an
 // informational note ("certutil not installed"), or a hard error.
 type NSSResult struct {
-	Path     string
-	Status   NSSStatus
-	Message  string // human-readable detail, especially for NSSReadError
-	Entries  []TrustSourceEntry
+	Path    string
+	Status  NSSStatus
+	Message string // human-readable detail, especially for NSSReadError
+	Entries []TrustSourceEntry
 }
 
 // trustAttrsLine matches a trust-attributes triple at the end of a certutil

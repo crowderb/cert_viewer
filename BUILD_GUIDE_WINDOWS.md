@@ -117,6 +117,14 @@ go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 golangci-lint run ./...
 ```
 
+Optional: install the project's pre-commit hooks (gofmt, goimports,
+golangci-lint) so the cheapest issues are caught before push. Requires
+`pip install --user pre-commit` (or `pipx install pre-commit`):
+
+```bash
+pre-commit install
+```
+
 Expected output — every package should report `ok` or `[no test files]`, and
 `golangci-lint` should exit with status 0.
 

@@ -448,7 +448,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "ready",
+      "status": "done",
       "dependencies": [
         "4.A"
       ],
@@ -468,11 +468,11 @@
       "lock_expires": null,
       "archived": false,
       "created_at": "2026-04-25",
-      "completed_at": null,
-      "completed_by": null,
-      "completion_summary": null,
-      "branch": null,
-      "commit": null,
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Added vuln CI job running govulncheck@v1.3.0 ./... \u2014 non-blocking (continue-on-error) pending 4.D toolchain pin since baseline shows 17 reachable Go stdlib CVEs (all fixed in 1.25.x patch releases) plus one transitive x/image finding via Fyne. CLAUDE.md updated: Code Conventions documents govulncheck in pre-PR workflow; Known Technical Debt #8 records the non-blocking exception with explicit removal trigger.",
+      "branch": "feature/govulncheck-precommit",
+      "commit": "62e81d9",
       "tests_added": 0
     },
     {
@@ -483,7 +483,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "ready",
+      "status": "done",
       "dependencies": [
         "4.A"
       ],
@@ -505,11 +505,11 @@
       "lock_expires": null,
       "archived": false,
       "created_at": "2026-04-25",
-      "completed_at": null,
-      "completed_by": null,
-      "completion_summary": null,
-      "branch": null,
-      "commit": null,
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Added .pre-commit-config.yaml with gofmt + goimports (dnephin/pre-commit-golang@v0.5.1) and golangci-lint (local hook, --new-from-rev=main for incremental commit-time runs). pre-commit run --all-files passes clean. Cleanup commit corrected pre-existing gofmt drift in 11 files (map literal alignment, no behavior change). CLAUDE.md Quick Start and all three BUILD_GUIDE_*.md document pre-commit install. Hooks are advisory; CI remains the blocking authority.",
+      "branch": "feature/govulncheck-precommit",
+      "commit": "0538fd3",
       "tests_added": 0
     },
     {

@@ -696,7 +696,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [
         "5.A"
       ],
@@ -715,11 +715,17 @@
         "Workflow exits cleanly without double-tagging when run twice on the same commit.",
         "Tag push triggers the downstream release workflow."
       ],
-      "assigned_agent": "opus-4:50f32f66",
-      "assigned_at": "2026-04-26T05:24:32Z",
-      "lock_expires": "2026-04-26T07:24:32Z",
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
       "archived": false,
-      "created_at": "2026-04-26"
+      "created_at": "2026-04-26",
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Added .github/workflows/auto-tag.yml \u2014 runs on push to main, computes next YYYY.MM.DD.N (skip-if-tagged guard makes it idempotent), creates annotated tag using the merge commit's subject as message, pushes via GITHUB_TOKEN. Updated release.yml to also trigger on the CalVer tag pattern alongside the legacy v* glob, so the auto-tag \u2192 release chain is intact. CLAUDE.md Git Workflow now documents the merge=tag=release convention.",
+      "branch": "feature/about-menu-and-auto-tag",
+      "commit": "6ba358d",
+      "tests_added": 0
     },
     {
       "id": "5.C",
@@ -729,7 +735,7 @@
       "type": "feature",
       "priority": "medium",
       "effort": "small",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [
         "5.A"
       ],
@@ -745,11 +751,17 @@
         "Each install-guide link opens the corresponding BUILD_GUIDE_*.md on github.com.",
         "Dialog dismisses cleanly with Esc and the Close button."
       ],
-      "assigned_agent": "opus-4:50f32f66",
-      "assigned_at": "2026-04-26T05:24:32Z",
-      "lock_expires": "2026-04-26T07:24:32Z",
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
       "archived": false,
-      "created_at": "2026-04-26"
+      "created_at": "2026-04-26",
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Added internal/ui/dialogs/about.go with ShowAbout(win) \u2014 modal showing Version/Commit/BuildDate from internal/version plus hyperlinks to the repo and per-OS install guides on github.com. cmd/cert_viewer/main.go gains a Help menu (About, GitHub Repository, Install Guides submenu) wired to dialogs.RepoURL and dialogs.InstallGuides. URL/open failures log via slog.Warn instead of panicking. No automated tests on the dialog itself (matches existing internal/ui/dialogs convention); visual confirmation on a real display still required before merge.",
+      "branch": "feature/about-menu-and-auto-tag",
+      "commit": "bad5e7e",
+      "tests_added": 0
     },
     {
       "id": "5.D",
@@ -759,7 +771,7 @@
       "type": "feature",
       "priority": "medium",
       "effort": "small",
-      "status": "backlog",
+      "status": "ready",
       "dependencies": [
         "5.A",
         "5.C"

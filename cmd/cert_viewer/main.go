@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -453,6 +454,35 @@ func main() {
 	editMenu := fyne.NewMenu("Edit",
 		fyne.NewMenuItem("Preferences", preferencesDialog),
 	)
+
+	// Help menu: About dialog plus quick-access shortcuts to the
+	// repository and the per-OS install guides on github.com. Each
+	// shortcut opens the URL in the system default browser.
+	openURLInBrowser := func(raw string) {
+		u, err := url.Parse(raw)
+		if err != nil {
+			slog.Warn("help menu URL parse failed", "url", raw, "err", err)
+			return
+		}
+		if openErr := application.OpenURL(u); openErr != nil {
+			slog.Warn("help menu URL open failed", "url", raw, "err", openErr)
+		}
+	}
+	installGuideItems := make([]*fyne.MenuItem, 0, len(dialogs.InstallGuides))
+	for _, g := range dialogs.InstallGuides {
+		guide := g // capture
+		installGuideItems = append(installGuideItems,
+			fyne.NewMenuItem(guide.Label, func() { openURLInBrowser(guide.URL) }))
+	}
+	installGuidesItem := fyne.NewMenuItem("Install Guides", nil)
+	installGuidesItem.ChildMenu = fyne.NewMenu("", installGuideItems...)
+
+	helpMenu := fyne.NewMenu("Help",
+		fyne.NewMenuItem("About cert_viewer", func() { dialogs.ShowAbout(window) }),
+		fyne.NewMenuItemSeparator(),
+		fyne.NewMenuItem("GitHub Repository", func() { openURLInBrowser(dialogs.RepoURL) }),
+		installGuidesItem,
+	)
 	resourcesMenu := fyne.NewMenu("Resources",
 		fyne.NewMenuItem("CCADB CSV", func() { dialogs.ShowCCADB(window, userPreferences) }),
 		fyne.NewMenuItemSeparator(),
@@ -566,7 +596,7 @@ func main() {
 			fyne.NewMenuItemSeparator(),
 			fyne.NewMenuItem("Quit", func() { application.Quit() }),
 		)
-		window.SetMainMenu(fyne.NewMainMenu(newFileMenu, editMenu, resourcesMenu))
+		window.SetMainMenu(fyne.NewMainMenu(newFileMenu, editMenu, resourcesMenu, helpMenu))
 	}
 	rebuildMainMenu()
 

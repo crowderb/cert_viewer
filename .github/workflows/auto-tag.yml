@@ -1,0 +1,75 @@
+name: Auto-tag CalVer
+
+# On every merge to main, compute the next CalVer tag (YYYY.MM.DD.N) and
+# push it. The release workflow (release.yml) is triggered by tag pushes
+# matching v* — auto-tag.yml does not retrigger itself because it filters
+# on `push: branches: [main]` only, and tag pushes do not match that.
+#
+# Numbering: the first merge any UTC day gets ".1"; subsequent merges
+# the same day increment N. The N is derived from existing tags rather
+# than a workflow-state file so the logic survives manual tags too.
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    permissions:
+      # Required to push the new tag back to the repo.
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need full history + tags so we can list YYYY.MM.DD.* and
+          # detect whether HEAD already has a tag pointing at it.
+          fetch-depth: 0
+
+      - name: Skip if HEAD already tagged
+        id: check_existing
+        run: |
+          set -euo pipefail
+          if git tag --points-at HEAD | grep -qE '^[0-9]{4}\.[0-9]{2}\.[0-9]{2}\.[0-9]+$'; then
+            echo "HEAD already has a CalVer tag — skipping."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compute next CalVer tag
+        if: steps.check_existing.outputs.skip != 'true'
+        id: compute
+        run: |
+          set -euo pipefail
+          DATE_PREFIX="$(date -u +%Y.%m.%d)"
+          # List tags for today; extract the trailing N; pick max + 1.
+          # Default to N=1 when no tags exist for today yet.
+          NEXT_N=$(
+            git tag --list "${DATE_PREFIX}.*" \
+              | awk -F. '{print $4}' \
+              | sort -n \
+              | tail -1 \
+              | awk '{print ($0+0)+1}'
+          )
+          if [ -z "${NEXT_N}" ] || [ "${NEXT_N}" = "1" -a -z "$(git tag --list "${DATE_PREFIX}.*")" ]; then
+            NEXT_N=1
+          fi
+          NEW_TAG="${DATE_PREFIX}.${NEXT_N}"
+          echo "Computed next tag: ${NEW_TAG}"
+          echo "new_tag=${NEW_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Create and push annotated tag
+        if: steps.check_existing.outputs.skip != 'true'
+        env:
+          NEW_TAG: ${{ steps.compute.outputs.new_tag }}
+        run: |
+          set -euo pipefail
+          # Use the merge commit subject as the tag message; the body
+          # stays minimal so `git show <tag>` is readable.
+          MSG="$(git log -1 --pretty=%s HEAD)"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${NEW_TAG}" -m "${MSG}"
+          git push origin "${NEW_TAG}"
+          echo "Pushed ${NEW_TAG}."

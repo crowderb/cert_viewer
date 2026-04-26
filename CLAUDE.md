@@ -298,6 +298,22 @@ the `-race` run is the merge gate.
 - **Squash before merging PRs**
 - See global `~/.claude/CLAUDE.md` for full git practices
 
+### Versioning & releases
+
+Merging to `main` automatically tags the merge commit with a CalVer tag of
+the form `YYYY.MM.DD.N` (UTC date; `N` increments per merge that day). The
+tag push then triggers `.github/workflows/release.yml`, which builds
+artifacts for Linux / Windows / macOS amd64 / macOS arm64 with the version
+injected via `-ldflags` (see `internal/version/`). The auto-tag logic
+lives in `.github/workflows/auto-tag.yml` and is idempotent: if HEAD
+already has a CalVer tag, the run skips.
+
+To cut a release: just merge the PR. There is no manual tagging step.
+To skip a release for a particular merge: pre-tag HEAD with `git tag -a
+<some-other-name> -m "..." && git push origin <some-other-name>` before
+merging — but in practice that is rarely needed; every merge is a release
+under this convention.
+
 ---
 
 ## Roadmap Reference

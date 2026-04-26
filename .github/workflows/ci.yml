@@ -54,5 +54,5 @@ jobs:
         with:
           # Pin to match the version installed locally and documented in
           # CLAUDE.md; bump in lockstep when upgrading.
-          version: v1.62.2
+          version: v1.64.8
           args: --timeout=5m

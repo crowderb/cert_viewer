@@ -38,7 +38,7 @@ go build -o bin/cert_viewer ./cmd/cert_viewer
 go test ./...
 
 # Run lint (matches CI; pin matches .golangci.yml + ci.yml)
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 golangci-lint run ./...
 ```
 
@@ -160,7 +160,7 @@ their parent family's anchor directory automatically.
 - **Error handling:** Always check errors; wrap with context using `fmt.Errorf("context: %w", err)`
 - **Formatting:** Run `gofmt` before committing
 - **Linting:** `.golangci.yml` at the repo root is the source of truth for the
-  enabled linter set; CI runs `golangci-lint v1.62.2` as a blocking job
+  enabled linter set; CI runs `golangci-lint v1.64.8` as a blocking job
   (`.github/workflows/ci.yml`). Run `golangci-lint run ./...` locally before
   opening a PR. The config aligns with `~/.claude/languages/go.md`'s required
   linter list (`errcheck`, `staticcheck`, `gosec`, `revive`, `gocritic`,

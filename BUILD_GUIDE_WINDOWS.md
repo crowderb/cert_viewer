@@ -113,7 +113,7 @@ Run the linter exactly as CI does (pin matches `.github/workflows/ci.yml` and
 `.golangci.yml`):
 
 ```bash
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 golangci-lint run ./...
 ```
 

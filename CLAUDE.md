@@ -51,9 +51,11 @@ golangci-lint run ./...
 go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
 govulncheck ./...
 
-# One-time: install pre-commit hooks (gofmt, goimports, golangci-lint)
+# One-time: install both pre-commit and pre-push hooks
+#   pre-commit stage: gofmt, goimports, incremental golangci-lint (fast)
+#   pre-push   stage: go test -race ./..., govulncheck ./... (slower; once per push)
 pip install --user pre-commit   # or: pipx install pre-commit
-pre-commit install
+pre-commit install --hook-type pre-commit --hook-type pre-push
 ```
 
 ---

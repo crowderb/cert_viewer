@@ -174,6 +174,11 @@ their parent family's anchor directory automatically.
 - **Atomic writes:** Temporary file + `os.Rename()` for any file that must not be
   partially written (see `fetcher.go`)
 - **Preferences:** Access via `prefs.Load()` and `prefs.Save()` — never hard-code paths
+- **HTTP client:** Use `internal/httpclient` (`httpclient.Default()` / `httpclient.CCADBDownload()`)
+  for all outbound HTTP. `http.DefaultClient` is banned because it has no timeout — a
+  misbehaving server that dribbles bytes forever defeats context-only deadlines since
+  there is no idle-read timeout. Always thread `context.Context` through to
+  `http.NewRequestWithContext`.
 - **Naming style:** Standard Go conventions; exported types/functions for anything used
   across packages; unexported for package-internal helpers
 

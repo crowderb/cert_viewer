@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"cert_viewer/internal/httpclient"
 	"cert_viewer/internal/prefs"
 )
 
@@ -28,7 +29,7 @@ func discoverLatestCCADBURL(ctx context.Context, resourcesURL string) (string, e
 	if err != nil {
 		return "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.Default().Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -117,7 +118,7 @@ func EnsureCCADBCSV(ctx context.Context, p prefs.Preferences) <-chan error {
 			ch <- err
 			return
 		}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := httpclient.CCADBDownload().Do(req)
 		if err != nil {
 			ch <- err
 			return

@@ -15,6 +15,7 @@ import (
 	"fyne.io/fyne/v2/widget"
 
 	"cert_viewer/internal/certs"
+	"cert_viewer/internal/httpclient"
 	"cert_viewer/internal/prefs"
 	"cert_viewer/internal/resources"
 	"cert_viewer/internal/ui"
@@ -474,7 +475,7 @@ func fetchRemoteCert(ctx context.Context, url string) (*x509.Certificate, error)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.Default().Do(req)
 	if err != nil {
 		return nil, err
 	}

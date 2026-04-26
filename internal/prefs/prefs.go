@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -108,8 +109,11 @@ func Load() (Preferences, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			// Ensure directory exists for future saves
-			_ = os.MkdirAll(dir, 0o755)
+			// Ensure directory exists for future saves. Failure here is not
+			// fatal — the next prefs.Save() will surface a clearer error.
+			if mkErr := os.MkdirAll(dir, 0o755); mkErr != nil {
+				slog.Warn("config dir create failed", "dir", dir, "err", mkErr)
+			}
 			return p, nil
 		}
 		return p, err

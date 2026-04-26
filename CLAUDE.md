@@ -201,6 +201,14 @@ their parent family's anchor directory automatically.
   misbehaving server that dribbles bytes forever defeats context-only deadlines since
   there is no idle-read timeout. Always thread `context.Context` through to
   `http.NewRequestWithContext`.
+- **Logging:** `log/slog` is the project standard. `cmd/cert_viewer/main.go`'s
+  `configureLogger()` runs first thing in `main()` and installs a stderr text
+  handler at `INFO` (or `DEBUG` when `CERT_VIEWER_LOG=debug`). Use
+  `slog.Default()` everywhere — never `log.Printf` / `fmt.Println` /
+  `zerolog` / `logrus`. For best-effort cleanup that previously used
+  `_ = err`, log at `slog.Warn`. For unexpected failures, `slog.Error`. Keep
+  log records free of certificate or PKCS#12 contents — paths and error
+  strings only.
 - **Naming style:** Standard Go conventions; exported types/functions for anything used
   across packages; unexported for package-internal helpers
 

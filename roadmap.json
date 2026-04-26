@@ -602,7 +602,7 @@
       "type": "enhancement",
       "priority": "medium",
       "effort": "small",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [
         "4.H"
       ],
@@ -617,11 +617,17 @@
         "Rotation behavior matches 4.H.",
         "Documented in CLAUDE.md Runtime Paths."
       ],
-      "assigned_agent": "opus-4:50f32f66",
-      "assigned_at": "2026-04-26T06:19:40Z",
-      "lock_expires": "2026-04-26T08:19:40Z",
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
       "archived": false,
-      "created_at": "2026-04-26"
+      "created_at": "2026-04-26",
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Added internal/prefs/logdir_darwin.go: ~/Library/Logs/cert_viewer/, mkdir 0o755. Console.app reads this dir automatically. Test under t.TempDir+t.Setenv HOME. CLAUDE.md Runtime Paths now lists the macOS log file directly without the 4.I-pending caveat.",
+      "branch": "feature/log-paths-macos-windows",
+      "commit": "dd1a145",
+      "tests_added": 1
     },
     {
       "id": "4.J",
@@ -631,7 +637,7 @@
       "type": "enhancement",
       "priority": "medium",
       "effort": "small",
-      "status": "in_progress",
+      "status": "done",
       "dependencies": [
         "4.H"
       ],
@@ -648,11 +654,17 @@
         "Logger does not crash or panic when stderr is unavailable (windowsgui).",
         "Documented in CLAUDE.md Runtime Paths."
       ],
-      "assigned_agent": "opus-4:50f32f66",
-      "assigned_at": "2026-04-26T06:19:40Z",
-      "lock_expires": "2026-04-26T08:19:40Z",
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
       "archived": false,
-      "created_at": "2026-04-26"
+      "created_at": "2026-04-26",
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Added internal/prefs/logdir_windows.go: %LOCALAPPDATA%\\\\cert_viewer\\\\Logs\\\\, mkdir 0o755. LOCALAPPDATA resolved via os.Getenv with UserCacheDir fallback. The 'Logs' subdirectory keeps logs distinct from cache data in Explorer. Tests under t.TempDir+t.Setenv cover both happy path and the LOCALAPPDATA-unset fallback. Cross-OS test compilation verified. CLAUDE.md Runtime Paths updated.",
+      "branch": "feature/log-paths-macos-windows",
+      "commit": "dd1a145",
+      "tests_added": 2
     },
     {
       "id": "5.A",

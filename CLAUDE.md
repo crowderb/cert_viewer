@@ -40,6 +40,15 @@ go test ./...
 # Run lint (matches CI; pin matches .golangci.yml + ci.yml)
 go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
 golangci-lint run ./...
+
+# Vulnerability scan (matches CI vuln job; currently advisory — see Known
+# Technical Debt for the 4.D toolchain bump that flips it to blocking)
+go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
+govulncheck ./...
+
+# One-time: install pre-commit hooks (gofmt, goimports, golangci-lint)
+pip install --user pre-commit   # or: pipx install pre-commit
+pre-commit install
 ```
 
 ---

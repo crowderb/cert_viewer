@@ -1,0 +1,33 @@
+# Pre-commit hooks for cert_viewer.
+#
+# One-time setup:
+#   pip install --user pre-commit   # or: pipx install pre-commit
+#   pre-commit install              # writes .git/hooks/pre-commit
+#
+# Run against the whole tree (matches CI baseline):
+#   pre-commit run --all-files
+#
+# These hooks are advisory at the developer level. CI is the source of truth
+# for blocking checks (.github/workflows/ci.yml — test, lint, vuln jobs);
+# pre-commit just catches the cheapest class of issues before push.
+
+repos:
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+      - id: go-imports
+
+  # golangci-lint runs as a local hook so it picks up the locally-installed
+  # binary (pinned to v1.64.8 in CI; install with
+  # `go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8`).
+  # `--new-from-rev=main` keeps commit-time runs incremental; the same hook
+  # passes cleanly on a clean main because there are no new findings.
+  - repo: local
+    hooks:
+      - id: golangci-lint
+        name: golangci-lint (incremental vs. main)
+        entry: golangci-lint run --new-from-rev=main
+        language: system
+        types: [go]
+        pass_filenames: false

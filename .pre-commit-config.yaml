@@ -1,15 +1,20 @@
 # Pre-commit hooks for cert_viewer.
 #
-# One-time setup:
+# One-time setup (installs both pre-commit AND pre-push hooks):
 #   pip install --user pre-commit   # or: pipx install pre-commit
-#   pre-commit install              # writes .git/hooks/pre-commit
+#   pre-commit install --hook-type pre-commit --hook-type pre-push
 #
 # Run against the whole tree (matches CI baseline):
-#   pre-commit run --all-files
+#   pre-commit run --all-files                    # commit-stage hooks
+#   pre-commit run --hook-stage pre-push --all-files
 #
-# These hooks are advisory at the developer level. CI is the source of truth
-# for blocking checks (.github/workflows/ci.yml — test, lint, vuln jobs);
-# pre-commit just catches the cheapest class of issues before push.
+# Stages:
+#   pre-commit (fast, every commit) — gofmt, goimports, incremental golangci-lint
+#   pre-push   (slower, once per push) — full test suite + govulncheck
+#
+# CI is still the source of truth for blocking checks
+# (.github/workflows/ci.yml — test, lint, vuln jobs); these hooks just shift
+# feedback earlier so a broken push is caught before the round-trip to GitHub.
 
 repos:
   - repo: https://github.com/dnephin/pre-commit-golang
@@ -18,16 +23,36 @@ repos:
       - id: go-fmt
       - id: go-imports
 
-  # golangci-lint runs as a local hook so it picks up the locally-installed
-  # binary (pinned to v1.64.8 in CI; install with
-  # `go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8`).
-  # `--new-from-rev=main` keeps commit-time runs incremental; the same hook
-  # passes cleanly on a clean main because there are no new findings.
   - repo: local
     hooks:
+      # golangci-lint runs as a local hook so it picks up the locally-installed
+      # binary (pinned to v1.64.8 in CI; install with
+      # `go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8`).
+      # `--new-from-rev=main` keeps commit-time runs incremental; the same hook
+      # passes cleanly on a clean main because there are no new findings.
       - id: golangci-lint
         name: golangci-lint (incremental vs. main)
         entry: golangci-lint run --new-from-rev=main
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      # Pre-push: run the full race-enabled test suite. Mirrors the CI test
+      # job exactly so a broken push is caught before the round-trip.
+      - id: go-test-race
+        name: go test -race -count=1 ./...
+        stages: [pre-push]
+        entry: go test -race -count=1 ./...
+        language: system
+        types: [go]
+        pass_filenames: false
+
+      # Pre-push: run govulncheck. Mirrors the CI vuln job. Requires
+      # `go install golang.org/x/vuln/cmd/govulncheck@v1.3.0` in $PATH.
+      - id: govulncheck
+        name: govulncheck ./...
+        stages: [pre-push]
+        entry: govulncheck ./...
         language: system
         types: [go]
         pass_filenames: false

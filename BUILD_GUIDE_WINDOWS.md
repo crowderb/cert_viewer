@@ -48,7 +48,12 @@ sudo apt install -y gcc-mingw-w64-x86-64 git nsis
 
 ---
 
-## 2. Install Go (1.24 or later)
+## 2. Install Go (1.25.9 or later)
+
+The project pins the Go toolchain in `go.mod` (`toolchain go1.25.9`).
+Contributors should install at least Go 1.25.0 — the toolchain directive
+will fetch `go1.25.9` automatically on first build if a newer version is
+installed locally; on older versions the `go` command refuses to build.
 
 ### Native Windows
 Download the Windows MSI installer from https://go.dev/dl/ and run it. The installer

@@ -413,7 +413,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "ready",
+      "status": "done",
       "dependencies": [],
       "steps": [
         "Add `toolchain go1.24.0` line to go.mod immediately after the `go 1.24.0` line.",
@@ -433,11 +433,11 @@
       "lock_expires": null,
       "archived": false,
       "created_at": "2026-04-25",
-      "completed_at": null,
-      "completed_by": null,
-      "completion_summary": null,
-      "branch": null,
-      "commit": null,
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4:50f32f66",
+      "completion_summary": "Pinned toolchain to go1.25.9 in go.mod; go directive moved to 1.25.0 (required by golang.org/x/image v0.38.0, force-bumped to clear the last govulncheck finding). Baseline went from 18 reachable vulnerabilities to 0 \u2014 flipped the CI vuln job to blocking by removing continue-on-error. CLAUDE.md and all three BUILD_GUIDE_*.md updated to document the toolchain pin; KTD #8 removed since the carve-out it described is resolved.",
+      "branch": "feature/pin-go-toolchain-1.25.9",
+      "commit": "333689b",
       "tests_added": 0
     },
     {
@@ -520,7 +520,7 @@
       "type": "enhancement",
       "priority": "low",
       "effort": "small",
-      "status": "backlog",
+      "status": "ready",
       "dependencies": [
         "4.D"
       ],

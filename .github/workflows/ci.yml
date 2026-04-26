@@ -52,13 +52,18 @@ jobs:
           sudo apt-get install -y build-essential libgl1-mesa-dev xorg-dev \
             libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
 
+      # Build golangci-lint from source with the pinned toolchain rather than
+      # downloading the prebuilt binary via golangci-lint-action. The v1.64.8
+      # release was built with Go 1.24, which fails with "the Go language
+      # version (go1.24) used to build golangci-lint is lower than the
+      # targeted Go version" once go.mod targets 1.25+. Using `go install`
+      # compiles the linter under our toolchain (1.25.9) so the version-skew
+      # check passes; bump in lockstep with CLAUDE.md when upgrading.
+      - name: Install golangci-lint
+        run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          # Pin to match the version installed locally and documented in
-          # CLAUDE.md; bump in lockstep when upgrading.
-          version: v1.64.8
-          args: --timeout=5m
+        run: golangci-lint run --timeout=5m
 
   vuln:
     runs-on: ubuntu-latest
@@ -70,17 +75,19 @@ jobs:
         with:
           go-version-file: go.mod
 
+      - name: Install system dependencies
+        # Required because govulncheck loads packages with cgo; the Fyne
+        # GLFW/GL backend won't build without these headers.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libgl1-mesa-dev xorg-dev \
+            libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
+
       # govulncheck only flags vulnerabilities in code paths the project
       # actually reaches, so signal stays high. Pinned version keeps results
       # reproducible; bump in lockstep with CLAUDE.md when upgrading.
       - name: Install govulncheck
         run: go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
 
-      # continue-on-error is a deliberate exception, not a permanent state.
-      # Today's baseline lists Go stdlib CVEs (resolved by bumping the Go
-      # toolchain — tracked as roadmap task 4.D) and one indirect dependency
-      # (golang.org/x/image, transitively pulled by Fyne). Once 4.D ships,
-      # remove `continue-on-error` so this job blocks merges.
       - name: govulncheck
-        continue-on-error: true
         run: govulncheck ./...

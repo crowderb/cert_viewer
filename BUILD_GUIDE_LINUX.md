@@ -27,7 +27,12 @@ sudo apt install -y \
 
 ---
 
-## 2. Install Go (1.24 or later)
+## 2. Install Go (1.25.9 or later)
+
+The project pins the Go toolchain in `go.mod` (`toolchain go1.25.9`).
+Contributors should install at least Go 1.25.0 — the toolchain directive
+will fetch `go1.25.9` automatically on first build if a newer version is
+installed locally; on older versions the `go` command refuses to build.
 
 Check whether Go is already installed and at the required version:
 
@@ -38,16 +43,16 @@ go version
 If not installed or out of date, download and install from https://go.dev/dl/:
 
 ```bash
-# Replace 1.24.0 with the latest stable release shown at go.dev/dl
-curl -LO https://go.dev/dl/go1.24.0.linux-amd64.tar.gz
+# Replace 1.25.9 with the latest stable release shown at go.dev/dl
+curl -LO https://go.dev/dl/go1.25.9.linux-amd64.tar.gz
 sudo rm -rf /usr/local/go
-sudo tar -C /usr/local -xzf go1.24.0.linux-amd64.tar.gz
-rm go1.24.0.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.25.9.linux-amd64.tar.gz
+rm go1.25.9.linux-amd64.tar.gz
 
 # Add Go to PATH — add this line to ~/.bashrc or ~/.profile for persistence
 export PATH=$PATH:/usr/local/go/bin
 
-go version   # should print: go version go1.24.0 linux/amd64
+go version   # should print: go version go1.25.9 linux/amd64
 ```
 
 ---

@@ -1,6 +1,8 @@
 module cert_viewer
 
-go 1.24.0
+go 1.25.0
+
+toolchain go1.25.9
 
 require (
 	fyne.io/fyne/v2 v2.5.3
@@ -33,9 +35,9 @@ require (
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
 	github.com/yuin/goldmark v1.7.1 // indirect
-	golang.org/x/image v0.18.0 // indirect
+	golang.org/x/image v0.38.0 // indirect
 	golang.org/x/mobile v0.0.0-20231127183840-76ac6878050a // indirect
 	golang.org/x/net v0.49.0 // indirect
-	golang.org/x/text v0.34.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

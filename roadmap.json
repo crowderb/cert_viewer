@@ -771,7 +771,7 @@
       "type": "feature",
       "priority": "medium",
       "effort": "small",
-      "status": "ready",
+      "status": "in_progress",
       "dependencies": [
         "5.A",
         "5.C"
@@ -790,9 +790,9 @@
         "Tests cover newer / older / equal / malformed-tag cases plus 200 and 5xx HTTP paths.",
         "CLAUDE.md documents the opt-in posture."
       ],
-      "assigned_agent": null,
-      "assigned_at": null,
-      "lock_expires": null,
+      "assigned_agent": "opus-4:50f32f66",
+      "assigned_at": "2026-04-26T06:06:12Z",
+      "lock_expires": "2026-04-26T08:06:12Z",
       "archived": false,
       "created_at": "2026-04-26"
     }

@@ -9,6 +9,8 @@ import (
 	"net/http"
 
 	"golang.org/x/crypto/ocsp"
+
+	"cert_viewer/internal/httpclient"
 )
 
 // CheckOCSP queries the first OCSP URL in cert.OCSPServer and returns the
@@ -42,7 +44,7 @@ func CheckOCSP(ctx context.Context, cert, issuer *x509.Certificate) (*ocsp.Respo
 	}
 	httpReq.Header.Set("Content-Type", "application/ocsp-request")
 
-	resp, err := http.DefaultClient.Do(httpReq)
+	resp, err := httpclient.Default().Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("OCSP request to %s: %w", ocspURL, err)
 	}
@@ -86,7 +88,7 @@ func fetchIssuerCert(ctx context.Context, url string) (*x509.Certificate, error)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.Default().Do(req)
 	if err != nil {
 		return nil, err
 	}

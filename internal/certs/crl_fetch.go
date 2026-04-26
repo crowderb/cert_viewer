@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"cert_viewer/internal/httpclient"
 )
 
 // FetchCRL downloads the CRL at url and parses it.
@@ -14,7 +16,7 @@ func FetchCRL(ctx context.Context, url string) (*x509.RevocationList, error) {
 	if err != nil {
 		return nil, fmt.Errorf("building CRL request: %w", err)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpclient.Default().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("fetching CRL from %s: %w", url, err)
 	}

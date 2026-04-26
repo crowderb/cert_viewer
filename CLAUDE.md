@@ -174,6 +174,11 @@ their parent family's anchor directory automatically.
 - **Atomic writes:** Temporary file + `os.Rename()` for any file that must not be
   partially written (see `fetcher.go`)
 - **Preferences:** Access via `prefs.Load()` and `prefs.Save()` — never hard-code paths
+- **HTTP client:** Use `internal/httpclient` (`httpclient.Default()` / `httpclient.CCADBDownload()`)
+  for all outbound HTTP. `http.DefaultClient` is banned because it has no timeout — a
+  misbehaving server that dribbles bytes forever defeats context-only deadlines since
+  there is no idle-read timeout. Always thread `context.Context` through to
+  `http.NewRequestWithContext`.
 - **Naming style:** Standard Go conventions; exported types/functions for anything used
   across packages; unexported for package-internal helpers
 
@@ -229,6 +234,12 @@ Priority order for new tests:
 3. `internal/resources/` — SKI parsing (including hex vs base64), CSV parsing, date parsing
 4. `cmd/cert_viewer/` — integration tests are last; UI testing with Fyne requires
    `fyne.io/fyne/v2/test` package
+
+**Race detection:** Run `go test -race -count=1 ./...` before merging significant
+changes. CI runs the same invocation as a blocking job; `-race` catches data
+races at test time, `-count=1` defeats the test cache (which interacts poorly
+with `-race` in CI). Plain `go test ./...` is fine for the inner edit-loop, but
+the `-race` run is the merge gate.
 
 ---
 

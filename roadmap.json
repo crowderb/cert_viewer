@@ -413,7 +413,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "backlog",
+      "status": "ready",
       "dependencies": [],
       "steps": [
         "Add `toolchain go1.24.0` line to go.mod immediately after the `go 1.24.0` line.",

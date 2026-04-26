@@ -343,7 +343,7 @@
       "type": "infra",
       "priority": "high",
       "effort": "small",
-      "status": "ready",
+      "status": "in_progress",
       "dependencies": [
         "4.A"
       ],
@@ -358,9 +358,9 @@
         "No new ad-hoc //go:build !race exclusions are introduced unless individually justified in a comment.",
         "CLAUDE.md documents -race as the standard local test invocation."
       ],
-      "assigned_agent": null,
-      "assigned_at": null,
-      "lock_expires": null,
+      "assigned_agent": "opus-4:50f32f66",
+      "assigned_at": "2026-04-26T02:48:56Z",
+      "lock_expires": "2026-04-26T04:48:56Z",
       "archived": false,
       "created_at": "2026-04-25",
       "completed_at": null,
@@ -378,7 +378,7 @@
       "type": "enhancement",
       "priority": "high",
       "effort": "small",
-      "status": "backlog",
+      "status": "in_progress",
       "dependencies": [],
       "steps": [
         "Add a small internal/httpclient package (or a package-private `httpClient = &http.Client{Timeout: 30 * time.Second}` in each of internal/certs and internal/resources \u2014 pick whichever the deep-module-architect agent recommends; a shared internal package is preferred so timeouts can be tuned in one place).",
@@ -393,9 +393,9 @@
         "New httptest-backed timeout test passes and demonstrates a 30s timeout actually fires.",
         "CLAUDE.md documents the convention and the rationale."
       ],
-      "assigned_agent": null,
-      "assigned_at": null,
-      "lock_expires": null,
+      "assigned_agent": "opus-4:50f32f66",
+      "assigned_at": "2026-04-26T02:49:02Z",
+      "lock_expires": "2026-04-26T04:49:02Z",
       "archived": false,
       "created_at": "2026-04-25",
       "completed_at": null,

@@ -489,7 +489,7 @@ func parseSKIToUpperHex(s string) string {
 		// Uppercase and return
 		for i := 0; i < len(cleaned); i++ {
 			if cleaned[i] >= 'a' && cleaned[i] <= 'f' {
-				cleaned[i] = cleaned[i] - ('a' - 'A')
+				cleaned[i] -= 'a' - 'A'
 			}
 		}
 		return string(cleaned)

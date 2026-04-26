@@ -34,8 +34,12 @@ go run ./cmd/cert_viewer
 # Build binary
 go build -o bin/cert_viewer ./cmd/cert_viewer
 
-# Run tests (once test suite exists)
+# Run tests
 go test ./...
+
+# Run lint (matches CI; pin matches .golangci.yml + ci.yml)
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
+golangci-lint run ./...
 ```
 
 ---
@@ -155,6 +159,14 @@ their parent family's anchor directory automatically.
 
 - **Error handling:** Always check errors; wrap with context using `fmt.Errorf("context: %w", err)`
 - **Formatting:** Run `gofmt` before committing
+- **Linting:** `.golangci.yml` at the repo root is the source of truth for the
+  enabled linter set; CI runs `golangci-lint v1.62.2` as a blocking job
+  (`.github/workflows/ci.yml`). Run `golangci-lint run ./...` locally before
+  opening a PR. The config aligns with `~/.claude/languages/go.md`'s required
+  linter list (`errcheck`, `staticcheck`, `gosec`, `revive`, `gocritic`,
+  `bodyclose`, `errorlint`, `contextcheck`, `noctx`, `nilerr`, plus extras).
+  When upgrading the pinned version, update both the GitHub Action and this
+  doc together.
 - **Hex normalization:** All SKIs are normalized to uppercase hex with no separator
   for internal comparisons (`NormalizeHexBytesNoSepUpper` in `format.go`)
 - **Goroutines for I/O:** Background operations (CCADB fetch, local roots generation)
@@ -172,8 +184,12 @@ their parent family's anchor directory automatically.
 These are existing issues to be aware of when making changes. Do not work around them
 silently — reference this list and address them as part of related work.
 
-1. **Zero test coverage** — no `_test.go` files exist. New code should include tests;
-   existing packages (`certs/`, `prefs/`, `resources/`) are the highest priority targets.
+1. **Doc-comment lint coverage is partial** — `.golangci.yml` enables `revive` for
+   `var-naming` only; the `exported` and `package-comments` rules are deliberately
+   disabled. Roughly 30 missing exported-symbol doc comments and several missing
+   package comments would surface if those rules were turned on. Plan to address as
+   a follow-up cleanup task in the roadmap (Section 4 area) rather than churning
+   the lint-bootstrap PR.
 
 2. **Monolithic `main.go`** — all UI rendering (summary, details, chain, advanced
    comparison, all dialogs) lives in one ~723-line file. Refactoring into

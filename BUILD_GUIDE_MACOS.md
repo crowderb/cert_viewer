@@ -83,13 +83,22 @@ go mod tidy
 
 ---
 
-## 5. Run the Test Suite
+## 5. Run the Test Suite and Linter
 
 ```bash
 go test ./...
 ```
 
-Expected output — every package should report `ok` or `[no test files]`:
+Run the linter exactly as CI does (pin matches `.github/workflows/ci.yml` and
+`.golangci.yml`):
+
+```bash
+go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.62.2
+golangci-lint run ./...
+```
+
+Expected output — every package should report `ok` or `[no test files]`, and
+`golangci-lint` should exit with status 0:
 
 ```
 ?   	cert_viewer/cmd/cert_viewer	[no test files]

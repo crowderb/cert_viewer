@@ -40,7 +40,7 @@ func Build(containerRoot *fyne.Container, p prefs.Preferences) {
 		lbl.TextStyle = fyne.TextStyle{Bold: true}
 		// Light gray background row
 		bg := canvas.NewRectangle(color.NRGBA{R: 240, G: 240, B: 240, A: 255})
-		row := container.NewMax(bg, container.NewPadded(lbl))
+		row := container.NewStack(bg, container.NewPadded(lbl))
 		containerRoot.Add(row)
 	}
 	addEntry := func(subject, ski, serial string, origins []resources.OriginRef) {

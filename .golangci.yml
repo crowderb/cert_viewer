@@ -1,0 +1,82 @@
+# golangci-lint configuration for cert_viewer.
+#
+# Aligned with ~/.claude/languages/go.md (updated 2026-Q2): blocking lint
+# is part of CI (.github/workflows/ci.yml `lint` job).
+#
+# When updating linters or thresholds, also bump the pinned version in CI
+# so local and CI runs agree.
+
+run:
+  timeout: 5m
+  tests: true
+  modules-download-mode: readonly
+
+linters:
+  disable-all: true
+  enable:
+    # Required by ~/.claude/languages/go.md
+    - errcheck       # catches unchecked errors (the most common Go bug class)
+    - govet          # standard vet checks
+    - staticcheck    # comprehensive static analysis
+    - gosec          # security-focused checks
+    - revive         # modern golint replacement
+    - gocritic       # opinionated style and correctness checks
+    - bodyclose      # catches unclosed HTTP response bodies
+    - errorlint      # catches incorrect error wrapping/comparison
+    - contextcheck   # catches missing context propagation
+    - noctx          # catches HTTP requests without context
+    - nilerr         # catches `return nil` after error checks
+    # Useful extras (low false-positive rate)
+    - ineffassign    # ineffectual assignments
+    - unused         # unused code
+    - misspell       # common spelling mistakes in comments
+
+linters-settings:
+  errcheck:
+    exclude-functions:
+      - (io.Closer).Close
+      - (*os.File).Close
+
+  gosec:
+    excludes:
+      # Rationale for each suppression — re-evaluate when the project context changes.
+      - G101  # Hardcoded credentials — false positives on CCADB column-name string constants.
+      - G104  # Errors not checked — duplicates errcheck; suppress here to avoid double reporting.
+      - G115  # Integer overflow conversion — too many false positives in well-bounded conversions; revisit if a real overflow surfaces.
+      - G204  # Subprocess launched with variable — required for NSS DB reads via `certutil` (internal/resources/nssdb_linux.go).
+      - G301  # Directory perms 0750 — caches under ~/.cache use 0755 by Linux convention; not security-sensitive.
+      - G304  # File from variable path — cert_viewer is a viewer; opening user-specified files is its purpose.
+      - G306  # File perms 0600 — local caches and exports use 0644 per Linux convention; not secrets.
+      - G401  # SHA-1 use — cert fingerprints are SHA-1 by user expectation; matches browser cert UIs.
+      - G505  # SHA-1 import — same rationale as G401.
+
+  revive:
+    rules:
+      - name: var-naming
+      # Doc-comment rules (exported, package-comments) are deliberately omitted:
+      # adding ~30 missing doc comments is tracked as a separate cleanup task,
+      # not bundled into the lint-bootstrap PR.
+
+  gocritic:
+    # Run only the "diagnostic" tag (correctness-oriented). Style and performance
+    # tags produce mostly stylistic noise against this codebase; revisit later
+    # via the doc-comment / style cleanup task tracked in the roadmap.
+    disabled-checks:
+      - filepathJoin     # filepath.Join detection — flags intentional uses.
+      - ifElseChain      # noisy, low value in this codebase.
+      - singleCaseSwitch # accepted pattern in some switches kept open for future cases.
+    enabled-tags:
+      - diagnostic
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  exclude-rules:
+    # Test helpers commonly call methods that return errors only for production
+    # code paths; keep the bar lower for tests.
+    - path: _test\.go
+      linters:
+        - contextcheck
+        - noctx
+        - errcheck

@@ -238,7 +238,7 @@ func upperNoSep(n *big.Int) string {
 	for i := 0; i < len(s); i++ {
 		c := s[i]
 		if c >= 'a' && c <= 'f' {
-			c = c - ('a' - 'A')
+			c -= 'a' - 'A'
 		}
 		out[i] = c
 	}

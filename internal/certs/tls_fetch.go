@@ -68,7 +68,7 @@ func FetchTLSCerts(rawInput string, skipVerify bool) ([]*x509.Certificate, error
 	if err != nil {
 		return nil, fmt.Errorf("TLS connection to %s:%s failed: %w", host, port, err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	peerCerts := conn.ConnectionState().PeerCertificates
 	if len(peerCerts) == 0 {

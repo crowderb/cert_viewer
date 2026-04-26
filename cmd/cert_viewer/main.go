@@ -221,7 +221,7 @@ func main() {
 			summaryGrid.Refresh()
 		}
 		if pkcs12Chain != nil {
-			chain.BuildFromCerts(window, chainTabs, pkcs12Chain, userPreferences)
+			chain.BuildFromCerts(ctx, window, chainTabs, pkcs12Chain, userPreferences)
 		} else {
 			var chainCtx context.Context
 			chainCtx, cancelChain = context.WithCancel(ctx)

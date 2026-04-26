@@ -448,7 +448,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "ready",
+      "status": "in_progress",
       "dependencies": [
         "4.A"
       ],
@@ -463,9 +463,9 @@
         "Any deliberate-accept entries are documented in CLAUDE.md's 'Known Technical Debt' section with a link to the upstream issue.",
         "CLAUDE.md documents govulncheck in the standard local workflow."
       ],
-      "assigned_agent": null,
-      "assigned_at": null,
-      "lock_expires": null,
+      "assigned_agent": "opus-4:50f32f66",
+      "assigned_at": "2026-04-26T03:14:57Z",
+      "lock_expires": "2026-04-26T05:14:57Z",
       "archived": false,
       "created_at": "2026-04-25",
       "completed_at": null,
@@ -483,7 +483,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "ready",
+      "status": "in_progress",
       "dependencies": [
         "4.A"
       ],
@@ -500,9 +500,9 @@
         "CLAUDE.md and BUILD_GUIDE_*.md document the install step.",
         "Pre-commit hooks are advisory at the developer level \u2014 they do not change CI behavior (CI is the source of truth via 4.A and 4.B)."
       ],
-      "assigned_agent": null,
-      "assigned_at": null,
-      "lock_expires": null,
+      "assigned_agent": "opus-4:50f32f66",
+      "assigned_at": "2026-04-26T03:14:57Z",
+      "lock_expires": "2026-04-26T05:14:57Z",
       "archived": false,
       "created_at": "2026-04-25",
       "completed_at": null,

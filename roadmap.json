@@ -2,7 +2,7 @@
   "$schema_version": "1.0",
   "project": "cert_viewer",
   "last_updated": "2026-04-25",
-  "priorities": "1) Testing & coverage \u2192 2) Cross-platform trust-store discovery \u2192 3) Distribution & installers",
+  "priorities": "1) Testing & coverage \u2192 2) Cross-platform trust-store discovery \u2192 3) Distribution & installers \u2192 4) Toolchain & quality gates (align to updated ~/.claude/languages/go.md)",
   "notes": [
     "Phase 1 (Foundation) and most of Phase 2 (platform trust stores, CI/release pipeline), Phase 3 (core features), and Phase 4 (advanced features) completed in 2026-Q1 \u2014 see docs/roadmaps/2026-Q1.md.",
     "Pre-existing ROADMAP.md is retained read-only until this migration is verified."
@@ -31,6 +31,13 @@
       "id": "3",
       "title": "Trust Store Discovery",
       "description": "Detect and surface non-standard / user-added root CAs without hard-coded paths or filesystem scanning. Driven by the discovery that homelab-ca was installed via update-ca-certificates but not surfaced because local_roots.json was stale.",
+      "docs": [],
+      "prerequisites": []
+    },
+    {
+      "id": "4",
+      "title": "Toolchain & Quality Gates",
+      "description": "Bring the project into alignment with the updated ~/.claude/languages/go.md standards: blocking lint, race detection, vulnerability scanning, HTTP timeouts, reproducible toolchain pinning, and pre-commit hooks. Each task is sized to a single reviewable PR and includes its own documentation updates so CLAUDE.md, README.md, and BUILD_GUIDE_*.md never drift behind the code.",
       "docs": [],
       "prerequisites": []
     }
@@ -291,6 +298,254 @@
       "branch": "feature/trust-sources-view",
       "commit": "d9c7036",
       "tests_added": 28
+    },
+    {
+      "id": "4.A",
+      "section": "4",
+      "title": "Add .golangci.yml with required linter set; wire into CI as blocking",
+      "description": "The CI workflow at .github/workflows/ci.yml currently runs only `go vet`. The updated Go guide requires a blocking golangci-lint step with a specific linter set. This is the single highest-leverage change in section 4 because several enabled linters (errcheck, errorlint, bodyclose, contextcheck, noctx) will surface real existing issues — most notably the swallowed `_ = os.Remove(...)` and `_ = prefs.Save(p)` errors in internal/resources/fetcher.go.",
+      "type": "infra",
+      "priority": "high",
+      "effort": "medium",
+      "status": "pending",
+      "dependencies": [],
+      "steps": [
+        "Add .golangci.yml at repo root enabling at minimum: errcheck, govet, staticcheck, gosec, revive, gocritic, bodyclose, errorlint, contextcheck, noctx, nilerr. Set `run.timeout: 5m` and `issues.exclude-use-default: false`. Pin a specific golangci-lint version (e.g. v1.62.x) for reproducibility.",
+        "Run `golangci-lint run ./...` locally and triage the resulting findings into two buckets: (a) fix-now (clear bugs or trivial fixes — e.g. swallowed errors in fetcher.go) and (b) deferred-with-//nolint (each suppression must carry a justification comment).",
+        "Add a `lint` job to .github/workflows/ci.yml using `golangci/golangci-lint-action@v6` with the same pinned version. Run it in parallel with the existing `test` job. Use `args: --timeout=5m` and ensure exit code is blocking.",
+        "Update CLAUDE.md 'Code Conventions Used in This Project' section to list the lint config as the source of truth and to mention `golangci-lint run` as a required pre-commit check.",
+        "Update each BUILD_GUIDE_*.md to document `golangci-lint run` in the local-development command list (alongside `go test ./...`)."
+      ],
+      "acceptance_criteria": [
+        ".golangci.yml exists at repo root and lists every required linter from the updated guide.",
+        "CI fails on a freshly introduced lint violation (verify with a throwaway commit during PR review).",
+        "All swallowed-error sites flagged by errcheck in internal/resources/fetcher.go are either fixed or carry a `//nolint:errcheck // <reason>` comment.",
+        "CLAUDE.md and the three BUILD_GUIDE_*.md files reference `golangci-lint run` as part of the standard local workflow.",
+        "Existing `go vet` step in ci.yml is removed (subsumed by golangci-lint's govet linter) or kept with a comment explaining why."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": null,
+      "completed_by": null,
+      "completion_summary": null,
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "4.B",
+      "section": "4",
+      "title": "Enable -race in CI test step",
+      "description": "The Go guide states race conditions caught at test time are vastly cheaper than in production. The current CI runs `go test ./...` without -race. EnsureCCADBCSV in internal/resources/fetcher.go spawns a goroutine that mutates a Preferences struct the caller may also touch — exactly the case -race exists to catch.",
+      "type": "infra",
+      "priority": "high",
+      "effort": "small",
+      "status": "pending",
+      "dependencies": [
+        "4.A"
+      ],
+      "steps": [
+        "Change the Test step in .github/workflows/ci.yml from `go test ./...` to `go test -race -count=1 ./...`. The `-count=1` defeats test caching, which interacts poorly with -race in CI.",
+        "Run `go test -race ./...` locally first; triage and fix any data races that surface (likely candidates: shared mutation of prefs.Preferences inside EnsureCCADBCSV, any UI-thread vs goroutine state in main.go).",
+        "If a race is genuinely unavoidable (e.g. third-party Fyne internals), document the suppression with a comment and a tracking note.",
+        "Update CLAUDE.md 'Testing Strategy' section to require `go test -race ./...` before merging significant changes."
+      ],
+      "acceptance_criteria": [
+        "CI runs `go test -race -count=1 ./...` and the run is green.",
+        "No new ad-hoc //go:build !race exclusions are introduced unless individually justified in a comment.",
+        "CLAUDE.md documents -race as the standard local test invocation."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": null,
+      "completed_by": null,
+      "completion_summary": null,
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "4.C",
+      "section": "4",
+      "title": "Introduce shared *http.Client with explicit timeouts; replace http.DefaultClient",
+      "description": "The Go guide explicitly calls out: 'Set timeouts on all http.Client and http.Server instances — defaults are unsafe (no timeout).' Today, internal/certs/crl_fetch.go:17, internal/certs/ocsp_check.go:45 and :89, and internal/resources/fetcher.go:31 and :120 all use `http.DefaultClient.Do(req)`. Context is correctly threaded through, but a misbehaving server that dribbles bytes forever will defeat context-only deadlines because there is no idle-read timeout. internal/certs/tls_fetch.go:63 already does the right thing for the TLS dial path; extend that pattern to HTTP.",
+      "type": "enhancement",
+      "priority": "high",
+      "effort": "small",
+      "status": "pending",
+      "dependencies": [],
+      "steps": [
+        "Add a small internal/httpclient package (or a package-private `httpClient = &http.Client{Timeout: 30 * time.Second}` in each of internal/certs and internal/resources — pick whichever the deep-module-architect agent recommends; a shared internal package is preferred so timeouts can be tuned in one place).",
+        "Replace every `http.DefaultClient.Do(req)` call in internal/certs/crl_fetch.go, internal/certs/ocsp_check.go, and internal/resources/fetcher.go with the new shared client.",
+        "Make the timeout values configurable via constants in the new package (e.g. `DefaultTimeout = 30 * time.Second`, `CCADBDownloadTimeout = 120 * time.Second` since the CSV is large) — do not pull from prefs yet; that is a follow-up if it ever becomes useful.",
+        "Add a table-driven test using httptest.NewServer that simulates a hung response (writes one byte then sleeps) and asserts the client returns an error within the configured timeout window. One test per timeout class is sufficient.",
+        "Update CLAUDE.md 'Code Conventions Used in This Project' to list the shared http client as the required pattern; add a one-liner explaining why http.DefaultClient is banned in this codebase."
+      ],
+      "acceptance_criteria": [
+        "No remaining call sites of `http.DefaultClient` in internal/certs or internal/resources (verify with `grep -r 'http.DefaultClient' internal/`).",
+        "Every HTTP-using function still accepts and threads a context.Context.",
+        "New httptest-backed timeout test passes and demonstrates a 30s timeout actually fires.",
+        "CLAUDE.md documents the convention and the rationale."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": null,
+      "completed_by": null,
+      "completion_summary": null,
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "4.D",
+      "section": "4",
+      "title": "Pin Go toolchain via go.mod toolchain directive",
+      "description": "go.mod currently has only `go 1.24.0`. The updated guide says: 'Pin to a specific Go minor version per project in go.mod, not just a floor ... Update toolchain directive in go.mod when bumping versions.' This makes builds reproducible across machines that may have newer Go installed and tells agents exactly which stdlib features are available.",
+      "type": "infra",
+      "priority": "medium",
+      "effort": "small",
+      "status": "pending",
+      "dependencies": [],
+      "steps": [
+        "Add `toolchain go1.24.0` line to go.mod immediately after the `go 1.24.0` line.",
+        "Run `go mod tidy` and verify go.sum is unchanged (toolchain directive should not change the dependency graph).",
+        "Run `go build ./cmd/cert_viewer` and `go test ./...` locally to confirm the build still works with the pinned toolchain.",
+        "Update CLAUDE.md 'Quick Start' section to mention the pinned Go version requirement and to point at `rustup`-style language: contributors should use the version pinned in go.mod (golang.org/dl/go1.24.0 or similar).",
+        "Update each BUILD_GUIDE_*.md to reference the toolchain directive when discussing Go installation."
+      ],
+      "acceptance_criteria": [
+        "go.mod contains both `go 1.24.0` and `toolchain go1.24.0` lines.",
+        "`go build ./...` and `go test ./...` succeed unchanged.",
+        "CLAUDE.md and BUILD_GUIDE_*.md reference the pinned toolchain.",
+        "CI's `actions/setup-go@v5 with: go-version-file: go.mod` continues to work (the action honors the toolchain directive)."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": null,
+      "completed_by": null,
+      "completion_summary": null,
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "4.E",
+      "section": "4",
+      "title": "Add govulncheck job to CI",
+      "description": "The Go guide implies dependency vulnerability scanning as part of the standard CI surface (analogous to `cargo audit` for Rust). govulncheck is the official Go tool for this and only flags vulnerabilities in code paths the project actually reaches, which keeps signal high.",
+      "type": "infra",
+      "priority": "medium",
+      "effort": "small",
+      "status": "pending",
+      "dependencies": [
+        "4.A"
+      ],
+      "steps": [
+        "Add a `vuln` job to .github/workflows/ci.yml that installs govulncheck (`go install golang.org/x/vuln/cmd/govulncheck@latest`) and runs `govulncheck ./...`. Pin to a specific govulncheck version once the workflow is stable.",
+        "Run govulncheck locally first to baseline existing findings; if any CVEs are flagged, decide per-finding whether to upgrade the dependency, switch dependency, or document a deliberate accept-and-track entry.",
+        "Make the job blocking by default. If a finding cannot be fixed quickly, gate the job behind a documented exception (e.g. `continue-on-error: true` with a tracked roadmap entry to remove it).",
+        "Update CLAUDE.md 'Code Conventions Used in This Project' to mention `govulncheck ./...` as part of the local pre-PR workflow."
+      ],
+      "acceptance_criteria": [
+        "CI has a `vuln` job that runs `govulncheck ./...` and is blocking on a clean baseline.",
+        "Any deliberate-accept entries are documented in CLAUDE.md's 'Known Technical Debt' section with a link to the upstream issue.",
+        "CLAUDE.md documents govulncheck in the standard local workflow."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": null,
+      "completed_by": null,
+      "completion_summary": null,
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "4.F",
+      "section": "4",
+      "title": "Add pre-commit hooks for gofmt, goimports, golangci-lint",
+      "description": "The Go guide recommends pre-commit hooks for `gofmt`, `goimports`, and `golangci-lint`. This catches the cheapest class of issues before CI runs. Use the `pre-commit` framework (https://pre-commit.com) since it is language-agnostic and already familiar across the user's other projects.",
+      "type": "infra",
+      "priority": "medium",
+      "effort": "small",
+      "status": "pending",
+      "dependencies": [
+        "4.A"
+      ],
+      "steps": [
+        "Add .pre-commit-config.yaml at repo root with hooks for gofmt (via `dnephin/pre-commit-golang` or equivalent), goimports, and `golangci-lint run --new-from-rev=main` (incremental, only checks changed files for speed).",
+        "Pin each hook to a specific revision.",
+        "Document `pre-commit install` as a one-time setup step in CLAUDE.md 'Quick Start' section.",
+        "Add a one-line note in each BUILD_GUIDE_*.md pointing contributors at `pre-commit install` for local hook setup.",
+        "Run the hooks locally against the current tree to confirm they pass cleanly."
+      ],
+      "acceptance_criteria": [
+        ".pre-commit-config.yaml exists at repo root and includes the three required hooks pinned to specific revisions.",
+        "`pre-commit run --all-files` succeeds against a clean main.",
+        "CLAUDE.md and BUILD_GUIDE_*.md document the install step.",
+        "Pre-commit hooks are advisory at the developer level — they do not change CI behavior (CI is the source of truth via 4.A and 4.B)."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": null,
+      "completed_by": null,
+      "completion_summary": null,
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
+    },
+    {
+      "id": "4.G",
+      "section": "4",
+      "title": "Adopt log/slog as the project logging standard (forward-looking)",
+      "description": "The Go guide prefers `log/slog` (Go 1.21+) for new code. The project barely logs today (it's a GUI app), so this task is small and forward-looking: pick the convention now so future logging additions don't fragment between `log.Printf` and `slog`.",
+      "type": "enhancement",
+      "priority": "low",
+      "effort": "small",
+      "status": "pending",
+      "dependencies": [
+        "4.D"
+      ],
+      "steps": [
+        "Audit existing logging call sites with `grep -rn '\\\"log\\\"\\|log\\.Print\\|fmt\\.Println' cmd/ internal/`. There should be very few, if any.",
+        "Replace any non-test `log.*` or `fmt.Println` debug-style calls with `slog` equivalents (use `slog.Default()` configured in main.go).",
+        "In cmd/cert_viewer/main.go, configure a default `slog.Handler` early in main() — text handler in dev (controlled by an env var like CERT_VIEWER_LOG=debug), JSON handler is overkill for a desktop GUI but should be the documented option for future.",
+        "Document the convention in CLAUDE.md 'Code Conventions Used in This Project' so future code uses slog and not log/log15/zerolog."
+      ],
+      "acceptance_criteria": [
+        "No remaining `log.Printf` / `log.Println` / `fmt.Println` calls in non-test code (verify with grep).",
+        "main.go configures a `slog` default handler before any package-init logging could fire.",
+        "CLAUDE.md documents slog as the project logging standard."
+      ],
+      "assigned_agent": null,
+      "assigned_at": null,
+      "lock_expires": null,
+      "archived": false,
+      "created_at": "2026-04-25",
+      "completed_at": null,
+      "completed_by": null,
+      "completion_summary": null,
+      "branch": null,
+      "commit": null,
+      "tests_added": 0
     }
   ]
 }

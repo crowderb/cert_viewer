@@ -23,11 +23,36 @@ jobs:
           sudo apt-get install -y build-essential libgl1-mesa-dev xorg-dev \
             libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
 
-      - name: Vet
-        run: go vet ./...
-
+      # `go vet` is included via golangci-lint's `govet` linter; the lint job
+      # is the source of truth. Keeping `go test` and `go build` here so test
+      # failures and build failures stay distinct from lint failures.
       - name: Test
         run: go test ./...
 
       - name: Build
         run: go build ./cmd/cert_viewer
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install system dependencies
+        # Required for golangci-lint to compile Fyne-dependent packages.
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential libgl1-mesa-dev xorg-dev \
+            libxcursor-dev libxrandr-dev libxinerama-dev libxi-dev
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          # Pin to match the version installed locally and documented in
+          # CLAUDE.md; bump in lockstep when upgrading.
+          version: v1.64.8
+          args: --timeout=5m

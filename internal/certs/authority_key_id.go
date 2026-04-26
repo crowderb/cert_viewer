@@ -8,7 +8,7 @@ import (
 	casn1 "golang.org/x/crypto/cryptobyte/asn1"
 )
 
-var oidExtensionAuthorityKeyId = asn1.ObjectIdentifier{2, 5, 29, 35}
+var oidExtensionAuthorityKeyID = asn1.ObjectIdentifier{2, 5, 29, 35}
 
 // AuthorityKeyIdentifierKeyID returns the keyIdentifier octets from the Authority Key
 // Identifier extension. It prefers x509.Certificate.AuthorityKeyId and otherwise
@@ -22,7 +22,7 @@ func AuthorityKeyIdentifierKeyID(cert *x509.Certificate) []byte {
 		return cert.AuthorityKeyId
 	}
 	for _, ext := range cert.Extensions {
-		if !ext.Id.Equal(oidExtensionAuthorityKeyId) {
+		if !ext.Id.Equal(oidExtensionAuthorityKeyID) {
 			continue
 		}
 		val := cryptobyte.String(ext.Value)

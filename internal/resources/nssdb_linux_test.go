@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -88,9 +87,7 @@ func TestEnumerateNSSDB_CertutilReadError(t *testing.T) {
 }
 
 func TestEnumerateAllNSSDBs_NoHome(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("HOME-based test is Linux-only")
-	}
+	// File is Linux-only via build tag, so no GOOS guard is needed.
 	t.Setenv("HOME", "")
 	// EnumerateAllNSSDBs uses os.UserHomeDir which on Linux falls back to
 	// passwd lookup when HOME is empty; we can't reliably make it return

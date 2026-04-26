@@ -1,7 +1,7 @@
 {
   "$schema_version": "1.0",
   "project": "cert_viewer",
-  "last_updated": "2026-04-25",
+  "last_updated": "2026-04-26",
   "priorities": "1) Testing & coverage \u2192 2) Cross-platform trust-store discovery \u2192 3) Distribution & installers \u2192 4) Toolchain & quality gates (align to updated ~/.claude/languages/go.md)",
   "notes": [
     "Phase 1 (Foundation) and most of Phase 2 (platform trust stores, CI/release pipeline), Phase 3 (core features), and Phase 4 (advanced features) completed in 2026-Q1 \u2014 see docs/roadmaps/2026-Q1.md.",
@@ -303,15 +303,15 @@
       "id": "4.A",
       "section": "4",
       "title": "Add .golangci.yml with required linter set; wire into CI as blocking",
-      "description": "The CI workflow at .github/workflows/ci.yml currently runs only `go vet`. The updated Go guide requires a blocking golangci-lint step with a specific linter set. This is the single highest-leverage change in section 4 because several enabled linters (errcheck, errorlint, bodyclose, contextcheck, noctx) will surface real existing issues — most notably the swallowed `_ = os.Remove(...)` and `_ = prefs.Save(p)` errors in internal/resources/fetcher.go.",
+      "description": "The CI workflow at .github/workflows/ci.yml currently runs only `go vet`. The updated Go guide requires a blocking golangci-lint step with a specific linter set. This is the single highest-leverage change in section 4 because several enabled linters (errcheck, errorlint, bodyclose, contextcheck, noctx) will surface real existing issues \u2014 most notably the swallowed `_ = os.Remove(...)` and `_ = prefs.Save(p)` errors in internal/resources/fetcher.go.",
       "type": "infra",
       "priority": "high",
       "effort": "medium",
-      "status": "pending",
+      "status": "done",
       "dependencies": [],
       "steps": [
         "Add .golangci.yml at repo root enabling at minimum: errcheck, govet, staticcheck, gosec, revive, gocritic, bodyclose, errorlint, contextcheck, noctx, nilerr. Set `run.timeout: 5m` and `issues.exclude-use-default: false`. Pin a specific golangci-lint version (e.g. v1.62.x) for reproducibility.",
-        "Run `golangci-lint run ./...` locally and triage the resulting findings into two buckets: (a) fix-now (clear bugs or trivial fixes — e.g. swallowed errors in fetcher.go) and (b) deferred-with-//nolint (each suppression must carry a justification comment).",
+        "Run `golangci-lint run ./...` locally and triage the resulting findings into two buckets: (a) fix-now (clear bugs or trivial fixes \u2014 e.g. swallowed errors in fetcher.go) and (b) deferred-with-//nolint (each suppression must carry a justification comment).",
         "Add a `lint` job to .github/workflows/ci.yml using `golangci/golangci-lint-action@v6` with the same pinned version. Run it in parallel with the existing `test` job. Use `args: --timeout=5m` and ensure exit code is blocking.",
         "Update CLAUDE.md 'Code Conventions Used in This Project' section to list the lint config as the source of truth and to mention `golangci-lint run` as a required pre-commit check.",
         "Update each BUILD_GUIDE_*.md to document `golangci-lint run` in the local-development command list (alongside `go test ./...`)."
@@ -328,22 +328,22 @@
       "lock_expires": null,
       "archived": false,
       "created_at": "2026-04-25",
-      "completed_at": null,
-      "completed_by": null,
-      "completion_summary": null,
-      "branch": null,
-      "commit": null,
+      "completed_at": "2026-04-26",
+      "completed_by": "opus-4-7:0f3afb9c",
+      "completion_summary": "Added .golangci.yml with required linter set (errcheck, staticcheck, gosec, revive, gocritic, bodyclose, errorlint, contextcheck, noctx, nilerr, plus ineffassign/unused/misspell). Wired blocking lint job to ci.yml (golangci-lint-action@v6, pinned v1.62.2). Fixed 5 real bugs surfaced: deferred conn.Close error, oidExtensionAuthorityKeyId naming, deprecated container.NewMax, dead runtime.GOOS check in linux-only file, context propagation through chain.BuildFromCerts. Documented gosec/gocritic categorical suppressions at rule level. Deferred revive doc-comment rules (~30 additions) to a separate cleanup task per CLAUDE.md tech debt entry. Updated CLAUDE.md and all three BUILD_GUIDE_*.md files with the new lint workflow.",
+      "branch": "feature/golangci-lint-ci",
+      "commit": "d349563",
       "tests_added": 0
     },
     {
       "id": "4.B",
       "section": "4",
       "title": "Enable -race in CI test step",
-      "description": "The Go guide states race conditions caught at test time are vastly cheaper than in production. The current CI runs `go test ./...` without -race. EnsureCCADBCSV in internal/resources/fetcher.go spawns a goroutine that mutates a Preferences struct the caller may also touch — exactly the case -race exists to catch.",
+      "description": "The Go guide states race conditions caught at test time are vastly cheaper than in production. The current CI runs `go test ./...` without -race. EnsureCCADBCSV in internal/resources/fetcher.go spawns a goroutine that mutates a Preferences struct the caller may also touch \u2014 exactly the case -race exists to catch.",
       "type": "infra",
       "priority": "high",
       "effort": "small",
-      "status": "pending",
+      "status": "ready",
       "dependencies": [
         "4.A"
       ],
@@ -374,16 +374,16 @@
       "id": "4.C",
       "section": "4",
       "title": "Introduce shared *http.Client with explicit timeouts; replace http.DefaultClient",
-      "description": "The Go guide explicitly calls out: 'Set timeouts on all http.Client and http.Server instances — defaults are unsafe (no timeout).' Today, internal/certs/crl_fetch.go:17, internal/certs/ocsp_check.go:45 and :89, and internal/resources/fetcher.go:31 and :120 all use `http.DefaultClient.Do(req)`. Context is correctly threaded through, but a misbehaving server that dribbles bytes forever will defeat context-only deadlines because there is no idle-read timeout. internal/certs/tls_fetch.go:63 already does the right thing for the TLS dial path; extend that pattern to HTTP.",
+      "description": "The Go guide explicitly calls out: 'Set timeouts on all http.Client and http.Server instances \u2014 defaults are unsafe (no timeout).' Today, internal/certs/crl_fetch.go:17, internal/certs/ocsp_check.go:45 and :89, and internal/resources/fetcher.go:31 and :120 all use `http.DefaultClient.Do(req)`. Context is correctly threaded through, but a misbehaving server that dribbles bytes forever will defeat context-only deadlines because there is no idle-read timeout. internal/certs/tls_fetch.go:63 already does the right thing for the TLS dial path; extend that pattern to HTTP.",
       "type": "enhancement",
       "priority": "high",
       "effort": "small",
-      "status": "pending",
+      "status": "backlog",
       "dependencies": [],
       "steps": [
-        "Add a small internal/httpclient package (or a package-private `httpClient = &http.Client{Timeout: 30 * time.Second}` in each of internal/certs and internal/resources — pick whichever the deep-module-architect agent recommends; a shared internal package is preferred so timeouts can be tuned in one place).",
+        "Add a small internal/httpclient package (or a package-private `httpClient = &http.Client{Timeout: 30 * time.Second}` in each of internal/certs and internal/resources \u2014 pick whichever the deep-module-architect agent recommends; a shared internal package is preferred so timeouts can be tuned in one place).",
         "Replace every `http.DefaultClient.Do(req)` call in internal/certs/crl_fetch.go, internal/certs/ocsp_check.go, and internal/resources/fetcher.go with the new shared client.",
-        "Make the timeout values configurable via constants in the new package (e.g. `DefaultTimeout = 30 * time.Second`, `CCADBDownloadTimeout = 120 * time.Second` since the CSV is large) — do not pull from prefs yet; that is a follow-up if it ever becomes useful.",
+        "Make the timeout values configurable via constants in the new package (e.g. `DefaultTimeout = 30 * time.Second`, `CCADBDownloadTimeout = 120 * time.Second` since the CSV is large) \u2014 do not pull from prefs yet; that is a follow-up if it ever becomes useful.",
         "Add a table-driven test using httptest.NewServer that simulates a hung response (writes one byte then sleeps) and asserts the client returns an error within the configured timeout window. One test per timeout class is sufficient.",
         "Update CLAUDE.md 'Code Conventions Used in This Project' to list the shared http client as the required pattern; add a one-liner explaining why http.DefaultClient is banned in this codebase."
       ],
@@ -413,7 +413,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "pending",
+      "status": "backlog",
       "dependencies": [],
       "steps": [
         "Add `toolchain go1.24.0` line to go.mod immediately after the `go 1.24.0` line.",
@@ -448,7 +448,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "pending",
+      "status": "ready",
       "dependencies": [
         "4.A"
       ],
@@ -483,7 +483,7 @@
       "type": "infra",
       "priority": "medium",
       "effort": "small",
-      "status": "pending",
+      "status": "ready",
       "dependencies": [
         "4.A"
       ],
@@ -498,7 +498,7 @@
         ".pre-commit-config.yaml exists at repo root and includes the three required hooks pinned to specific revisions.",
         "`pre-commit run --all-files` succeeds against a clean main.",
         "CLAUDE.md and BUILD_GUIDE_*.md document the install step.",
-        "Pre-commit hooks are advisory at the developer level — they do not change CI behavior (CI is the source of truth via 4.A and 4.B)."
+        "Pre-commit hooks are advisory at the developer level \u2014 they do not change CI behavior (CI is the source of truth via 4.A and 4.B)."
       ],
       "assigned_agent": null,
       "assigned_at": null,
@@ -520,14 +520,14 @@
       "type": "enhancement",
       "priority": "low",
       "effort": "small",
-      "status": "pending",
+      "status": "backlog",
       "dependencies": [
         "4.D"
       ],
       "steps": [
         "Audit existing logging call sites with `grep -rn '\\\"log\\\"\\|log\\.Print\\|fmt\\.Println' cmd/ internal/`. There should be very few, if any.",
         "Replace any non-test `log.*` or `fmt.Println` debug-style calls with `slog` equivalents (use `slog.Default()` configured in main.go).",
-        "In cmd/cert_viewer/main.go, configure a default `slog.Handler` early in main() — text handler in dev (controlled by an env var like CERT_VIEWER_LOG=debug), JSON handler is overkill for a desktop GUI but should be the documented option for future.",
+        "In cmd/cert_viewer/main.go, configure a default `slog.Handler` early in main() \u2014 text handler in dev (controlled by an env var like CERT_VIEWER_LOG=debug), JSON handler is overkill for a desktop GUI but should be the documented option for future.",
         "Document the convention in CLAUDE.md 'Code Conventions Used in This Project' so future code uses slog and not log/log15/zerolog."
       ],
       "acceptance_criteria": [

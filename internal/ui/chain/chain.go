@@ -418,8 +418,9 @@ func Build(ctx context.Context, win fyne.Window, chainTabs *container.AppTabs, l
 // BuildFromCerts renders a pre-built certificate chain directly into chainTabs
 // without any AIA fetching. certs[0] is the leaf; following entries are issuers
 // toward the root. A self-signed last certificate is shown only as a Root tab, not
-// duplicated as Issuer N.
-func BuildFromCerts(win fyne.Window, chainTabs *container.AppTabs, certList []*x509.Certificate, p prefs.Preferences) {
+// duplicated as Issuer N. ctx is propagated to issuer-resolution helpers so
+// long-running lookups can be cancelled with the surrounding request.
+func BuildFromCerts(ctx context.Context, win fyne.Window, chainTabs *container.AppTabs, certList []*x509.Certificate, p prefs.Preferences) {
 	chainTabs.Items = nil
 	if len(certList) == 0 {
 		chainTabs.Append(container.NewTabItem("No certificates", widget.NewLabel("The PKCS#12 bundle contained no certificates.")))
@@ -458,7 +459,7 @@ func BuildFromCerts(win fyne.Window, chainTabs *container.AppTabs, certList []*x
 	_, inCCADB := ccadbSet[key]
 	_, inLocal := localSet[key]
 	if inCCADB || inLocal {
-		if tryAppendParentViaAuthorityKeyID(context.Background(), chainTabs, win, last, p, localSet, ccadbSet, ccadbBySKI) {
+		if tryAppendParentViaAuthorityKeyID(ctx, chainTabs, win, last, p, localSet, ccadbSet, ccadbBySKI) {
 			chainTabs.Refresh()
 			return
 		}

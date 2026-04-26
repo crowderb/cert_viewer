@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -83,14 +84,19 @@ func EnsureCCADBCSV(ctx context.Context, p prefs.Preferences) <-chan error {
 		newName := prefs.CacheFilenameFromURL(p.Resources.CCADBURL)
 		if p.Resources.CachedFilename != newName {
 			if p.Resources.CachedFilename != "" {
-				_ = os.Remove(filepath.Join(cacheDir, p.Resources.CachedFilename))
+				oldPath := filepath.Join(cacheDir, p.Resources.CachedFilename)
+				if rmErr := os.Remove(oldPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
+					slog.Warn("stale CCADB cache remove failed", "path", oldPath, "err", rmErr)
+				}
 			}
 			p.Resources.CachedFilename = newName
 			prefsChanged = true
 		}
 
 		if prefsChanged {
-			_ = prefs.Save(p)
+			if saveErr := prefs.Save(p); saveErr != nil {
+				slog.Warn("CCADB prefs save failed", "err", saveErr)
+			}
 		}
 
 		path := filepath.Join(cacheDir, p.Resources.CachedFilename)
@@ -136,12 +142,16 @@ func EnsureCCADBCSV(ctx context.Context, p prefs.Preferences) <-chan error {
 		}
 		if _, err := io.Copy(f, resp.Body); err != nil {
 			f.Close()
-			_ = os.Remove(tmpPath)
+			if rmErr := os.Remove(tmpPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
+				slog.Warn("CCADB tmp cleanup failed", "path", tmpPath, "err", rmErr)
+			}
 			ch <- err
 			return
 		}
 		if err := f.Close(); err != nil {
-			_ = os.Remove(tmpPath)
+			if rmErr := os.Remove(tmpPath); rmErr != nil && !errors.Is(rmErr, os.ErrNotExist) {
+				slog.Warn("CCADB tmp cleanup failed", "path", tmpPath, "err", rmErr)
+			}
 			ch <- err
 			return
 		}

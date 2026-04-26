@@ -3,6 +3,7 @@ package dialogs
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"os"
 	"strconv"
@@ -171,7 +172,9 @@ func ShowPreferences(win fyne.Window, p prefs.Preferences, onApply func(prefs.Pr
 		} else {
 			p.Resources.RefreshDays = 30
 		}
-		_ = prefs.Save(p)
+		if err := prefs.Save(p); err != nil {
+			slog.Warn("preferences save failed", "err", err)
+		}
 		onApply(p)
 	}, win)
 	d.Resize(fyne.NewSize(540, 500))

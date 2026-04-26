@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,12 +35,35 @@ import (
 )
 
 func main() {
+	configureLogger()
+
 	application := app.NewWithID("io.github.crowderb.cert_viewer")
 	window := application.NewWindow("Certificate Viewer")
 	window.Resize(fyne.NewSize(800, 600))
 
 	// Load preferences
-	userPreferences, _ := prefs.Load()
+	userPreferences, err := prefs.Load()
+	if err != nil {
+		slog.Warn("preferences load failed; using defaults", "err", err)
+	}
+
+	// savePrefs persists userPreferences and logs (rather than aborting) on
+	// failure. Save errors are not user-actionable mid-session — better to
+	// keep the UI alive and surface the issue in logs.
+	savePrefs := func() {
+		if saveErr := prefs.Save(userPreferences); saveErr != nil {
+			slog.Warn("preferences save failed", "err", saveErr)
+		}
+	}
+
+	// ensureLocalRoots refreshes the cached local trust-roots JSON for the
+	// Compare and Trust Sources views. Failures are logged but do not block
+	// the subsequent build — those builders handle a stale or missing cache.
+	ensureLocalRoots := func(ctx context.Context) {
+		if rootsErr := resources.EnsureLocalRootsJSON(ctx); rootsErr != nil {
+			slog.Warn("local roots refresh failed", "err", rootsErr)
+		}
+	}
 
 	// UI state
 	var currentCert *x509.Certificate
@@ -309,7 +333,7 @@ func main() {
 			userPreferences.UI.LastDir = parent.String()
 		}
 		userPreferences = prefs.AddRecentFile(userPreferences, path)
-		_ = prefs.Save(userPreferences)
+		savePrefs()
 		rebuildMainMenu()
 
 		name := filepath.Base(path)
@@ -368,7 +392,7 @@ func main() {
 					userPreferences.UI.LastDir = parent.String()
 				}
 				userPreferences = prefs.AddRecentFile(userPreferences, rc.URI().Path())
-				_ = prefs.Save(userPreferences)
+				savePrefs()
 				rebuildMainMenu()
 			}
 
@@ -437,7 +461,7 @@ func main() {
 			advancedContent.Objects = []fyne.CanvasObject{widget.NewLabel("Building comparison...")}
 			advancedContent.Refresh()
 			go func() {
-				_ = resources.EnsureLocalRootsJSON(context.Background())
+				ensureLocalRoots(context.Background())
 				advanced.Build(advancedContent, userPreferences)
 			}()
 			tabs.SelectIndex(3) // Advanced tab
@@ -446,7 +470,7 @@ func main() {
 			trustSourcesContent.Objects = []fyne.CanvasObject{widget.NewLabel("Gathering trust sources...")}
 			trustSourcesContent.Refresh()
 			go func() {
-				_ = resources.EnsureLocalRootsJSON(context.Background())
+				ensureLocalRoots(context.Background())
 				trustsources.Build(trustSourcesContent, userPreferences)
 			}()
 			tabs.SelectIndex(4) // Trust Sources tab
@@ -462,7 +486,7 @@ func main() {
 		}
 		if len(alive) != len(userPreferences.UI.RecentFiles) {
 			userPreferences.UI.RecentFiles = alive
-			_ = prefs.Save(userPreferences)
+			savePrefs()
 		}
 
 		recentItem := fyne.NewMenuItem("Open Recent", nil)
@@ -479,7 +503,7 @@ func main() {
 			subItems = append(subItems, fyne.NewMenuItemSeparator())
 			subItems = append(subItems, fyne.NewMenuItem("Clear Recent", func() {
 				userPreferences.UI.RecentFiles = nil
-				_ = prefs.Save(userPreferences)
+				savePrefs()
 				rebuildMainMenu()
 			}))
 			recentItem.ChildMenu = fyne.NewMenu("", subItems...)
@@ -653,7 +677,7 @@ func main() {
 				userPreferences.UI.LastDir = parent.String()
 			}
 			userPreferences = prefs.AddRecentFile(userPreferences, path)
-			_ = prefs.Save(userPreferences)
+			savePrefs()
 			rebuildMainMenu()
 
 			if isPKCS12 {

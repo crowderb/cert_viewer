@@ -163,6 +163,26 @@ CC=x86_64-w64-mingw32-gcc CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
   -o cert_viewer-windows-amd64.exe ./cmd/cert_viewer
 ```
 
+To reproduce a CI-grade build that injects the version, commit, and build
+timestamp into the binary's `internal/version` package (the values shown
+in Help → About):
+
+```bash
+VERSION="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
+COMMIT="$(git rev-parse --short HEAD)"
+BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+CC=x86_64-w64-mingw32-gcc CGO_ENABLED=1 GOOS=windows GOARCH=amd64 \
+  go build -ldflags="-s -w -H windowsgui \
+    -X cert_viewer/internal/version.Version=$VERSION \
+    -X cert_viewer/internal/version.Commit=$COMMIT \
+    -X cert_viewer/internal/version.BuildDate=$BUILD_DATE" \
+  -o cert_viewer-windows-amd64.exe ./cmd/cert_viewer
+```
+
+Without the `-X` flags the binary reports `Version=dev` — useful for spotting
+non-release builds in bug reports.
+
 ---
 
 ## 7. Build the NSIS Installer

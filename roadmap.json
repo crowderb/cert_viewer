@@ -602,7 +602,7 @@
       "type": "enhancement",
       "priority": "medium",
       "effort": "small",
-      "status": "ready",
+      "status": "in_progress",
       "dependencies": [
         "4.H"
       ],
@@ -617,9 +617,9 @@
         "Rotation behavior matches 4.H.",
         "Documented in CLAUDE.md Runtime Paths."
       ],
-      "assigned_agent": null,
-      "assigned_at": null,
-      "lock_expires": null,
+      "assigned_agent": "opus-4:50f32f66",
+      "assigned_at": "2026-04-26T06:19:40Z",
+      "lock_expires": "2026-04-26T08:19:40Z",
       "archived": false,
       "created_at": "2026-04-26"
     },
@@ -631,7 +631,7 @@
       "type": "enhancement",
       "priority": "medium",
       "effort": "small",
-      "status": "ready",
+      "status": "in_progress",
       "dependencies": [
         "4.H"
       ],
@@ -648,9 +648,9 @@
         "Logger does not crash or panic when stderr is unavailable (windowsgui).",
         "Documented in CLAUDE.md Runtime Paths."
       ],
-      "assigned_agent": null,
-      "assigned_at": null,
-      "lock_expires": null,
+      "assigned_agent": "opus-4:50f32f66",
+      "assigned_at": "2026-04-26T06:19:40Z",
+      "lock_expires": "2026-04-26T08:19:40Z",
       "archived": false,
       "created_at": "2026-04-26"
     },

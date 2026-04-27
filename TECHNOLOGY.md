@@ -36,7 +36,7 @@ cert_viewer/
     │   ├── fetcher.go             # CCADB CSV download, caching, SKI/summary extraction
     │   ├── localroots_linux.go    # Debian/Ubuntu: parse /etc/ssl/certs/ca-certificates.crt
     │   ├── localroots_windows.go  # Windows: read ROOT store via golang.org/x/sys
-    │   ├── localroots_darwin.go   # macOS: Security framework (stub; returns empty)
+    │   ├── localroots_darwin.go   # macOS: Keychain extraction via `security find-certificate`
     │   └── localroots_unsupported.go  # Fallback for other platforms
     └── ui/
         ├── tightform.go           # TightTwoColLayout: compact two-column Fyne layout
@@ -174,7 +174,7 @@ User selects Resources > Compare Local vs CCADB
   → goroutine: resources.EnsureLocalRootsJSON()
       Linux:   parse /etc/ssl/certs/ca-certificates.crt
       Windows: enumerate ROOT store via golang.org/x/sys Windows APIs
-      macOS:   stub (returns empty)
+      macOS:   extract PEM from System Keychain via `security find-certificate` and parse
       → write ~/.cache/cert_viewer/local_roots.json
   → resources.LoadLocalRootsSKISet()  → map[SKI]LocalRootSummary
   → resources.LoadCCADBSummary()      → map[SKI]CCADBSummary
@@ -260,7 +260,9 @@ See [CLAUDE.md](CLAUDE.md) for the full annotated list. Current outstanding item
 - **Partial test coverage** — `internal/certs/`, `internal/prefs/`, and
   `internal/resources/` have meaningful coverage; `cmd/cert_viewer/` and most
   `internal/ui/` sub-packages have none. UI testing requires `fyne.io/fyne/v2/test`.
-- **Synchronous chain building network calls** — `chain.Build()` makes HTTP requests
-  on a background goroutine but UI progress is minimal; a progress spinner is planned.
-- **macOS trust store stub** — `localroots_darwin.go` returns an empty result.
-  Full Security framework integration is tracked in ROADMAP.md.
+- **macOS trust store (implemented)** — `localroots_darwin.go` now parses PEM output
+  from `security find-certificate` and returns platform roots for comparison.
+  (Previously listed as a stub; now implemented.)
+- **Chain building is async** — `ui/chain.Build()` performs network I/O on a
+  background goroutine, shows a spinner, and supports cancellation via
+  `context.Context`.

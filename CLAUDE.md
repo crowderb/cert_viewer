@@ -62,21 +62,28 @@ pre-commit install --hook-type pre-commit --hook-type pre-push
 
 ## Architecture
 
-The project uses a four-layer architecture inside a standard Go module layout:
+The project uses a layered Go module layout. The UI is now organized into focused
+subpackages rather than being rendered entirely from `cmd/cert_viewer/main.go`.
 
 ```
-cmd/cert_viewer/main.go          ← Application entry point; all UI orchestration
+cmd/cert_viewer/main.go          ← Application entry point; composes UI from internal/ui/*
 internal/
-  certs/                         ← Pure certificate parsing and formatting (no UI)
-    parser.go                    ← PEM/DER parsing
-    format.go                    ← Hex, OID, key usage, curve name formatting
-  prefs/
-    prefs.go                     ← Preferences types, JSON load/save, OS path helpers
-  resources/
-    fetcher.go                   ← CCADB CSV download, caching, SKI set loading
-    localroots.go                ← Linux trust bundle parsing → local_roots.json
-  ui/
-    tightform.go                 ← Custom Fyne two-column compact layout
+   certs/                         ← Pure certificate parsing and formatting (no UI)
+      parser.go                    ← PEM/DER parsing, PKCS#7-aware parsing helpers
+      format.go                    ← Hex, OID, key usage, NIST curve name formatting
+   prefs/                          ← Preferences types, JSON load/save, OS path helpers
+      prefs.go
+   resources/                      ← CCADB fetch, local roots, platform trust helpers
+      fetcher.go                    ← CCADB CSV download, caching, SKI/summary loading
+      localroots_linux.go           ← Linux trust bundle parsing → local_roots.json
+      localroots_darwin.go          ← macOS Keychain extraction via `security find-certificate` |
+   ui/                             ← Small UI packages used by `main.go`
+      tightform.go                  ← Custom Fyne two-column compact layout
+      chain/                        ← `internal/ui/chain` — chain building and tabs
+      compare/                      ← `internal/ui/compare` — certificate comparison view
+      summary/                      ← `internal/ui/summary` — summary/export helpers
+      trustsources/                 ← `internal/ui/trustsources` — trust sources view
+      advanced/                     ← `internal/ui/advanced` — advanced comparison features
 ```
 
 **Data flow — opening a certificate:**
@@ -112,8 +119,11 @@ internal/
 | `internal/certs/format.go` | 213 | Formatting: hex, OIDs, key usage, NIST curve names |
 | `internal/prefs/prefs.go` | 137 | `Preferences` struct, `Load()`, `Save()`, path helpers |
 | `internal/resources/fetcher.go` | 285 | CCADB CSV fetch, cache, SKI/summary loading |
-| `internal/resources/localroots.go` | 189 | Linux trust store → `local_roots.json` |
+| `internal/resources/localroots_linux.go` | 189 | Linux trust store → `local_roots.json` |
+| `internal/resources/localroots_darwin.go` | 120 | macOS Keychain extraction via `security find-certificate` |
 | `internal/ui/tightform.go` | 90 | `TightTwoColLayout` — compact two-column Fyne layout |
+| `internal/ui/chain/chain.go` | 520 | Certificate chain building (async) and tab rendering |
+| `internal/certs/parser.go` | 180 | `ParseCertificateOrPKCS7()` — handles PEM/DER and PKCS#7 bundles |
 
 ---
 
@@ -252,29 +262,28 @@ silently — reference this list and address them as part of related work.
    a follow-up cleanup task in the roadmap (Section 4 area) rather than churning
    the lint-bootstrap PR.
 
-2. **Monolithic `main.go`** — all UI rendering (summary, details, chain, advanced
-   comparison, all dialogs) lives in one ~723-line file. Refactoring into
-   `internal/ui/` sub-packages is tracked in the roadmap.
+2. **macOS trust store historical gap** — older docs noted macOS as unsupported. Platform
+   support has been added via `internal/resources/localroots_darwin.go` which extracts
+   PEM certificates from the system keychain using `security find-certificate`.
 
-3. **Duplicate hex formatting** — `formatHex()` and `formatSerialWithSep()` in
-   `main.go` are near-duplicates of `certs.FormatHex()` and `certs.FormatSerialWithSep()`.
-   The `main.go` versions accept `prefs.HexSeparator`; the `certs` versions accept
-   `string`. Consolidate when touching either.
+3. **Other active debts** — remain in the roadmap (doc-comments, monolithic `main.go`
+   refactor tasks that are intentionally staged, etc.). See ROADMAP.md for priorities.
 
-4. **`escapeMarkdown()` is dead code** — defined at the bottom of `main.go` but never
-   called. Remove when refactoring that file.
+**Resolved (moved from "Known Technical Debt")**
 
-5. **macOS trust store not yet supported** — `localroots_linux.go` reads
-   `/etc/ssl/certs/ca-certificates.crt`; `localroots_windows.go` reads the Windows
-   `ROOT` certificate store via `golang.org/x/sys/windows`. macOS (`localroots_unsupported.go`)
-   returns an empty result — platform support is tracked in ROADMAP.md Phase 2.
+- **Monolithic `main.go`** — the large UI rendering surface was refactored: UI code
+  lives in `internal/ui/*` and `main.go` composes those packages. See `cmd/cert_viewer/main.go` and
+  the `internal/ui` subpackages for evidence.
+- **Duplicate hex formatting** — canonical hex formatting now lives in `internal/certs/format.go`.
+  Callers use `certs.FormatHex(...)` (see `internal/ui/*` usages).
+- **`escapeMarkdown()` dead code** — previously present; removed in the refactor.
+- **Synchronous chain building** — chain building is performed asynchronously with a spinner
+  and cancellation via `context.Context` (see `internal/ui/chain/chain.go`).
+- **No PKCS#7 support** — PKCS#7 degenerate SignedData bundles from AIA are parsed by
+  `internal/certs/ParseCertificateOrPKCS7()` (see `internal/certs/parser.go`).
 
-6. **Synchronous chain building** — `buildAndRenderChain()` makes HTTP requests on the
-   UI goroutine, which will freeze the UI during chain fetches. Async chain building
-   with a progress indicator is in the roadmap.
-
-7. **No PKCS#7 support** — AIA CA Issuers URLs sometimes return PKCS#7 bundles.
-   `tryParseSingleCert()` will fail for these. Tracked in roadmap.
+If you want, I can move the above resolved items to a `docs/changes.md` changelog entry
+with commit links.
 
 ---
 

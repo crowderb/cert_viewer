@@ -125,8 +125,8 @@ internal/
 | CCADB CSV cache | `~/.cache/cert_viewer/ccadb_all_certificate_records_v2.csv` |
 | Local roots cache | `~/.cache/cert_viewer/local_roots.json` |
 | Log file (Linux) | `$XDG_STATE_HOME/cert_viewer/cert_viewer.log` (default `~/.local/state/cert_viewer/cert_viewer.log`) |
-| Log file (macOS, fallback) | `~/Library/Caches/cert_viewer/logs/cert_viewer.log` — replaced with `~/Library/Logs/cert_viewer/` once 4.I lands |
-| Log file (Windows, fallback) | `%LOCALAPPDATA%\cert_viewer\cache\logs\cert_viewer.log` — replaced with `%LOCALAPPDATA%\cert_viewer\Logs\` once 4.J lands |
+| Log file (macOS) | `~/Library/Logs/cert_viewer/cert_viewer.log` (Console.app reads this directory automatically) |
+| Log file (Windows) | `%LOCALAPPDATA%\cert_viewer\Logs\cert_viewer.log` |
 
 ### Logging
 
